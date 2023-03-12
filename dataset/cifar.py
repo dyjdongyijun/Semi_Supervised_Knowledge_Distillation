@@ -38,14 +38,19 @@ def get_cifar10(args, root):
 
     train_labeled_dataset = CIFAR10SSL(
         root, train_labeled_idxs, train=True,
-        transform=transform_labeled)
+        transform=transform_labeled, 
+        return_idx=True,
+    )
 
     train_unlabeled_dataset = CIFAR10SSL(
         root, train_unlabeled_idxs, train=True,
-        transform=TransformFixMatch(mean=cifar10_mean, std=cifar10_std))
+        transform=TransformFixMatch(mean=cifar10_mean, std=cifar10_std), 
+        return_idx=True,
+    )
 
     test_dataset = datasets.CIFAR10(
-        root, train=False, transform=transform_val, download=False)
+        root, train=False, transform=transform_val, download=False,
+    )
 
     return train_labeled_dataset, train_unlabeled_dataset, test_dataset
 
@@ -72,14 +77,19 @@ def get_cifar100(args, root):
 
     train_labeled_dataset = CIFAR100SSL(
         root, train_labeled_idxs, train=True,
-        transform=transform_labeled)
+        transform=transform_labeled,
+        return_idx=True,
+    )
 
     train_unlabeled_dataset = CIFAR100SSL(
         root, train_unlabeled_idxs, train=True,
-        transform=TransformFixMatch(mean=cifar100_mean, std=cifar100_std))
+        transform=TransformFixMatch(mean=cifar100_mean, std=cifar100_std),
+        return_idx=True,
+    )
 
     test_dataset = datasets.CIFAR100(
-        root, train=False, transform=transform_val, download=False)
+        root, train=False, transform=transform_val, download=False,
+    )
 
     return train_labeled_dataset, train_unlabeled_dataset, test_dataset
 
@@ -131,11 +141,12 @@ class TransformFixMatch(object):
 class CIFAR10SSL(datasets.CIFAR10):
     def __init__(self, root, indexs, train=True,
                  transform=None, target_transform=None,
-                 download=False):
+                 download=False, return_idx=False):
         super().__init__(root, train=train,
                          transform=transform,
                          target_transform=target_transform,
                          download=download)
+        self.return_idx = return_idx
         if indexs is not None:
             self.data = self.data[indexs]
             self.targets = np.array(self.targets)[indexs]
@@ -150,17 +161,21 @@ class CIFAR10SSL(datasets.CIFAR10):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target
+        if self.return_idx:
+            return img, target, index
+        else:
+            return img, target
 
 
 class CIFAR100SSL(datasets.CIFAR100):
     def __init__(self, root, indexs, train=True,
                  transform=None, target_transform=None,
-                 download=False):
+                 download=False, return_idx=False):
         super().__init__(root, train=train,
                          transform=transform,
                          target_transform=target_transform,
                          download=download)
+        self.return_idx = return_idx
         if indexs is not None:
             self.data = self.data[indexs]
             self.targets = np.array(self.targets)[indexs]
@@ -175,7 +190,10 @@ class CIFAR100SSL(datasets.CIFAR100):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target
+        if self.return_idx:
+            return img, target, index
+        else:
+            return img, target
 
 
 DATASET_GETTERS = {'cifar10': get_cifar10,

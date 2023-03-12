@@ -254,7 +254,10 @@ def rkd_loss(args, features_model, features_teacher):
     edge_teacher = edge_teacher[vmask]
     edge_model = (fea_model1[vmask] * fea_model2[vmask]).sum(dim=1)
     
-    loss_rkd = torch.norm(edge_teacher - edge_model, p=args.rkd_norm)/vmask.sum() if any(vmask) else 0.0
+    if any(vmask):
+        loss_rkd = torch.norm(edge_teacher - edge_model, p=args.rkd_norm)/vmask.sum()  
+    else:
+        loss_rkd = torch.Tensor([0.0]).to(args.device)
     return loss_rkd
     
 
@@ -555,7 +558,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                     rkd_features_teacher = teacher(rkd_inputs)
                 Lkd = rkd_loss(args, rkd_features_model, rkd_features_teacher) # on gpu
             else:
-                Lkd = 0.0
+                Lkd = torch.Tensor([0.0]).to(args.device)
 
             # loss
             loss = Lx + args.lambda_u * Lu + args.rkd_lambda * Lkd
@@ -609,6 +612,9 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
 
         if args.local_rank in [-1, 0]:
             test_loss, test_acc, top5 = test(args, test_loader, test_model, epoch)
+            
+            is_best = test_acc > best_acc
+            best_acc = max(test_acc, best_acc)
 
             wandb.log({
                 'epoch': epoch,
@@ -622,9 +628,6 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 'test_acc_5': top5,
                 'test_loss': test_loss,
             })
-
-            is_best = test_acc > best_acc
-            best_acc = max(test_acc, best_acc)
 
             model_to_save = model.module if hasattr(model, "module") else model
             if args.use_ema:

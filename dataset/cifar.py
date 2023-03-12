@@ -39,7 +39,6 @@ def get_cifar10(args, root):
     train_labeled_dataset = CIFAR10SSL(
         root, train_labeled_idxs, train=True,
         transform=transform_labeled, 
-        return_idx=True,
     )
 
     train_unlabeled_dataset = CIFAR10SSL(
@@ -97,14 +96,22 @@ def get_cifar100(args, root):
 def x_u_split(args, labels):
     label_per_class = args.num_labeled // args.num_classes
     labels = np.array(labels)
-    labeled_idx = []
+    
     # unlabeled data: all data (https://github.com/kekmodel/FixMatch-pytorch/issues/10)
     unlabeled_idx = np.array(range(len(labels)))
-    for i in range(args.num_classes):
-        idx = np.where(labels == i)[0]
-        idx = np.random.choice(idx, label_per_class, False)
-        labeled_idx.extend(idx)
-    labeled_idx = np.array(labeled_idx)
+    
+    # label selection
+    if args.labeler=='unif':
+        labeled_idx = np.random.choice(labels, args.num_labeled, False)
+    elif args.labeler=='class':
+        labeled_idx = []
+        for i in range(args.num_classes):
+            idx = np.where(labels == i)[0]
+            idx = np.random.choice(idx, label_per_class, False)
+            labeled_idx.extend(idx)
+        labeled_idx = np.array(labeled_idx)
+    else:
+        raise Exception(f'args.labeler = {args.labeler} not found')
     assert len(labeled_idx) == args.num_labeled
 
     if args.expand_labels or args.num_labeled < args.batch_size:
@@ -150,6 +157,7 @@ class CIFAR10SSL(datasets.CIFAR10):
         if indexs is not None:
             self.data = self.data[indexs]
             self.targets = np.array(self.targets)[indexs]
+            self.indices = np.arange(len(self.targets))[indexs]
 
     def __getitem__(self, index):
         img, target = self.data[index], self.targets[index]
@@ -162,7 +170,7 @@ class CIFAR10SSL(datasets.CIFAR10):
             target = self.target_transform(target)
 
         if self.return_idx:
-            return img, target, index
+            return img, target, self.indices[index]
         else:
             return img, target
 

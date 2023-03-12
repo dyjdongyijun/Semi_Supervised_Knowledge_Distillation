@@ -153,6 +153,8 @@ def model_config(args):
     if args.dataset == 'cifar10':
         args.num_classes = 10
         args.input_dim = [3,32,32]
+        args.num_train = 50000
+        args.num_test = 10000
         if args.arch == 'wideresnet':
             args.hidden_dim = [10]
             args.model_depth = 28
@@ -165,6 +167,9 @@ def model_config(args):
 
     elif args.dataset == 'cifar100':
         args.num_classes = 100
+        args.input_dim = [3,32,32]
+        args.num_train = 50000
+        args.num_test = 10000
         if args.arch == 'wideresnet':
             args.hidden_dim = [100]
             args.model_depth = 28
@@ -199,7 +204,8 @@ def create_model(args):
 
 def get_offline_teacher(args):
     pretrained_name = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}{args.teacher_dim:d}.pt')
-    return torch.load(pretrained_name).float()
+    teacher = torch.load(pretrained_name)[:args.num_train]
+    return teacher.float()
     
 
 IMAGENET_MODEL_DICT = {
@@ -272,7 +278,7 @@ def main():
                         help="expand labels to fit eval steps")
     parser.add_argument('--gpu_id', default='0', type=int,
                         help='id(s) for CUDA_VISIBLE_DEVICES')
-    parser.add_argument('--labeler', default='unif', type=str,
+    parser.add_argument('--labeler', default='class', type=str,
                         choices=['unif', 'class', 'active'], 
                         help='labele selection: unif=uniform over all samples / class=uniform per class / active=active learning')
     parser.add_argument('--lambda_u', default=1, type=float,
@@ -317,7 +323,7 @@ def main():
                         help='manual epoch number (useful on restarts)')
     parser.add_argument('--T', default=1, type=float,
                         help='pseudo label temperature')
-    parser.add_argument('--teacher_arch', type=str, default='resnet152', 
+    parser.add_argument('--teacher_arch', type=str, default='densenet161', 
                         choices=['densenet161', 'resnet152', 'wide_resnet101_2'],
                         help='teacher architecture')
     parser.add_argument('--teacher_data', type=str, default='cifar10', 
@@ -483,6 +489,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
         losses = AverageMeter()
         losses_x = AverageMeter()
         losses_u = AverageMeter()
+        losses_rkd = AverageMeter()
         mask_probs = AverageMeter()
         description = ""
         
@@ -492,15 +499,15 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             
         for batch_idx in range(args.eval_step):
             try:
-                inputs_x, targets_x, idx_x = next(labeled_iter)
+                inputs_x, targets_x = next(labeled_iter)
                 # error occurs ↓
-                # inputs_x, targets_x, idx_x = labeled_iter.next()
+                # inputs_x, targets_x = labeled_iter.next()
             except:
                 if args.world_size > 1:
                     labeled_epoch += 1
                     labeled_trainloader.sampler.set_epoch(labeled_epoch)
                 labeled_iter = iter(labeled_trainloader)
-                inputs_x, targets_x, idx_x = next(labeled_iter)
+                inputs_x, targets_x = next(labeled_iter)
                 # error occurs ↓
                 # inputs_x, targets_x = labeled_iter.next()
 
@@ -532,19 +539,17 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             # supervised loss
             Lx = F.cross_entropy(logits_x, targets_x, reduction='mean')
 
+            # dac loss
             pseudo_label = torch.softmax(logits_u_w.detach()/args.T, dim=-1)
             max_probs, targets_u = torch.max(pseudo_label, dim=-1)
             mask = max_probs.ge(args.threshold).float()
-
-            # dac loss
             Lu = (F.cross_entropy(logits_u_s, targets_u, reduction='none') * mask).mean()
             
             # rkd loss
             if args.rkd_lambda > 0.0:
                 rkd_features_model = torch.cat([logits_x, logits_u_w]) # on gpu
                 if args.teacher_mode == 'offline':
-                    rkd_idx = torch.cat([idx_x, idx_u])
-                    rkd_features_teacher = (teacher[rkd_idx]).to(args.device)
+                    rkd_features_teacher = (teacher[idx_u]).to(args.device)
                 else: # args.teacher_mode == 'online'
                     rkd_inputs = torch.cat([inputs_x, inputs_u_w]).to(args.device)
                     rkd_features_teacher = teacher(rkd_inputs)
@@ -564,6 +569,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             losses.update(loss.item())
             losses_x.update(Lx.item())
             losses_u.update(Lu.item())
+            losses_rkd.update(Lkd.item())
             optimizer.step()
             scheduler.step()
             if args.use_ema:
@@ -609,8 +615,10 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 'train_loss': losses.avg,
                 'train_loss_x': losses_x.avg,
                 'train_loss_u': losses_u.avg,
+                'train_loss_rkd': losses_rkd.avg,
                 'mask': mask_probs.avg,
                 'test_acc_1': test_acc,
+                'test_acc_1_best': best_acc,
                 'test_acc_5': top5,
                 'test_loss': test_loss,
             })

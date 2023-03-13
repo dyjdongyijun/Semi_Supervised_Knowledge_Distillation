@@ -247,6 +247,9 @@ def rkd_loss(args, features_model, features_teacher):
     if args.rkd_edge=='cos':
         _l2norm = lambda x: F.normalize(x, p=2.0, dim=1) #(n/2, dim_fea)
         edge_teacher = (_l2norm(fea_teacher1) * _l2norm(fea_teacher2)).sum(dim=1) #(n/2,)
+    elif args.rkd_edge=='maxmatch':
+        pslabel = lambda logit: torch.argmax(logit, dim=1)
+        edge_teacher = (pslabel(fea_teacher1)==pslabel(fea_teacher2)).float()
     else:
         raise Exception(f'args.rkd_edge = {args.rkd_edge} not found')
     edge_teacher = edge_teacher.detach()
@@ -310,10 +313,10 @@ def main():
     parser.add_argument('--resume', default='', type=str,
                         help='path to latest checkpoint (default: none)')
     parser.add_argument('--rkd_edge', default='cos', type=str,
-                        choices=['cos'], 
-                        help='edges of data graph that characterize pair-wise relation between samples, >= 0')
+                        choices=['cos', 'maxmatch'], 
+                        help='edges of data graph that characterize pair-wise relation between samples: cos(u,v) = (normalized(t(u),2) * normalized(t(v),2)).sum / maxmatch(u,v) = argmax(t(u))==argmax(t(v))')
     parser.add_argument('--rkd_edge_min', default=0.0, type=float,
-                        help='sparsification of data graph: w_e = (w_e >= rkd_tol) * w_e')
+                        help='sparsification of data graph: w_e = (w_e >= rkd_tol) * w_e [note w_e >= 0]')
     parser.add_argument('--rkd_lambda', default=0.0, type=float,
                         help='coefficient of relational knowledge distillation loss')
     parser.add_argument('--rkd_norm', default=2, type=int,
@@ -550,7 +553,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             
             # rkd loss
             if args.rkd_lambda > 0.0:
-                rkd_features_model = torch.cat([logits_x, logits_u_w]) # on gpu
+                rkd_features_model = logits_u_w # on gpu 
                 if args.teacher_mode == 'offline':
                     rkd_features_teacher = (teacher[idx_u]).to(args.device)
                 else: # args.teacher_mode == 'online'
@@ -617,7 +620,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             best_acc = max(test_acc, best_acc)
 
             wandb.log({
-                'epoch': epoch,
+                'epoch': epoch + 1,
                 'train_loss': losses.avg,
                 'train_loss_x': losses_x.avg,
                 'train_loss_u': losses_u.avg,
@@ -645,8 +648,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
 
             test_accs.append(test_acc)
             logger.info('Best top-1 acc: {:.2f}'.format(best_acc))
-            logger.info('Mean top-1 acc: {:.2f}\n'.format(
-                np.mean(test_accs[-20:])))
+            logger.info('Mean top-1 acc: {:.2f}\n'.format(np.mean(test_accs[-20:])))
 
     if args.local_rank in [-1, 0]:
         wandb.finish()

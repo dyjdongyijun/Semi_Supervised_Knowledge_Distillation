@@ -59,6 +59,21 @@ def CutoutAbs(img, v, **kwarg):
     PIL.ImageDraw.Draw(img).rectangle(xy, color)
     return img
 
+def CutoutAbs_bw(img, v, **kwarg):
+    w, h = img.size
+    x0 = np.random.uniform(0, w)
+    y0 = np.random.uniform(0, h)
+    x0 = int(max(0, x0 - v / 2.))
+    y0 = int(max(0, y0 - v / 2.))
+    x1 = int(min(w, x0 + v))
+    y1 = int(min(h, y0 + v))
+    xy = (x0, y0, x1, y1)
+    # gray
+    color = (127,)
+    img = img.copy()
+    PIL.ImageDraw.Draw(img).rectangle(xy, color)
+    return img
+
 
 def Equalize(img, **kwarg):
     return PIL.ImageOps.equalize(img)
@@ -184,6 +199,27 @@ def my_augment_pool():
     return augs
 
 
+def bw_augment_pool():
+    # Test
+    augs = [(AutoContrast, None, None),
+            (Brightness, 1.8, 0.1),
+            (Color, 1.8, 0.1),
+            (Contrast, 1.8, 0.1),
+            (Cutout, 0.2, 0),
+            (Equalize, None, None),
+            (Invert, None, None),
+            (Posterize, 4, 4),
+            (Rotate, 30, 0),
+            (Sharpness, 1.8, 0.1),
+            (ShearX, 0.3, 0),
+            (ShearY, 0.3, 0),
+            (Solarize, 256, 0),
+            (SolarizeAdd, 110, 0),
+            (TranslateX, 0.45, 0),
+            (TranslateY, 0.45, 0)]
+    return augs
+
+
 class RandAugmentPC(object):
     def __init__(self, n, m):
         assert n >= 1
@@ -218,3 +254,4 @@ class RandAugmentMC(object):
                 img = op(img, v=v, max_v=max_v, bias=bias)
         img = CutoutAbs(img, int(32*0.5))
         return img
+

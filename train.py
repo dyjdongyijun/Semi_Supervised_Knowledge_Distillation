@@ -74,7 +74,8 @@ def initiate_logging(args):
     
     wandb.init(
         project="FixMatch_RKD", 
-        entity="graph_based_ssl", 
+        # entity="dyjdongyijun", 
+        entity="mds-oden",
         reinit=True, 
         tags=['test_run'],
     )

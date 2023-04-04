@@ -27,6 +27,7 @@ sys.path.append('..')
 from cifar10_pretrained.cifar10_models import resnet, densenet, mobilenetv2
 
 from dataset.cifar import DATASET_GETTERS
+from dataset.fashionmnist import DATASET_GETTERS_fashionmnist
 from utils import AverageMeter, accuracy
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,21 @@ def model_config(args):
             args.model_depth = 29
             args.model_width = 64
     
+    elif args.dataset == 'fashionmnist':
+        args.num_classes = 10
+        args.input_dim = [1, 28, 28]
+        args.num_train = 60000
+        args.num_test = 10000
+        if args.arch == 'wideresnet':
+            args.hidden_dim = [10]
+            args.model_depth = 28
+            args.model_width = 2
+        elif args.arch == 'resnext':
+            args.hidden_dim = [10]
+            args.model_cardinality = 4
+            args.model_depth = 28
+            args.model_width = 4
+
     return args
 
 
@@ -275,7 +291,7 @@ def main():
     parser.add_argument('--batch_size', default=64, type=int,
                         help='train batchsize')
     parser.add_argument('--dataset', default='cifar10', type=str,
-                        choices=['cifar10', 'cifar100'], 
+                        choices=['cifar10', 'cifar100', 'fashionmnist'], 
                         help='dataset name')
     parser.add_argument('--ema_decay', default=0.999, type=float,
                         help='EMA decay rate')
@@ -364,8 +380,11 @@ def main():
     # dataloaders
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()
-
-    labeled_dataset, unlabeled_dataset, test_dataset = DATASET_GETTERS[args.dataset](args, args.root)
+    
+    if args.dataset == 'fashionmnist':
+        labeled_dataset, unlabeled_dataset, test_dataset = DATASET_GETTERS_fashionmnist['fashionmnist'](args, args.root)
+    else:
+        labeled_dataset, unlabeled_dataset, test_dataset = DATASET_GETTERS[args.dataset](args, args.root)
 
     if args.local_rank == 0:
         torch.distributed.barrier()
@@ -671,7 +690,8 @@ def test(args, test_loader, model, epoch):
     for batch_idx, (inputs, targets) in enumerate(test_loader):
         data_time.update(time.time() - end)
         model.eval()
-
+        
+        inputs = inputs.repeat(1, 3, 1, 1)   # hack to get this to have 3 channels like training data
         inputs = inputs.to(args.device)
         targets = targets.to(args.device)
         outputs = model(inputs)

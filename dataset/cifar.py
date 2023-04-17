@@ -113,7 +113,7 @@ def x_u_split(args, labels):
     # unlabeled data: all data (https://github.com/kekmodel/FixMatch-pytorch/issues/10)
     unlabeled_idx = np.arange(labels.size)
     if args.percentunl < 100.:
-        unlabeled_idx = np.sort(np.random.choice(unlabeled_idx, int(unlabeled_idx.size * float(args.percentunl) / 100.), replace=False))
+        unlabeled_idx = np.load(os.path.join(f"dataset/inds_{args.dataset}_percentunl_{args.percentunl}.npy"))
     
     # label selection
     if args.labeler=='unif':

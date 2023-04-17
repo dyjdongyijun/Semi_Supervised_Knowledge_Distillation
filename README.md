@@ -3,7 +3,7 @@
 ## Setup
 
 ### Setup teacher models pre-trained on CIFAR-10
-We follow the instruction from [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) to download the weights of teacher models pre-trained on CIFAR-10 (or alternatively via [Google Drive](https://drive.google.com/file/d/17fmN8eQdLpq2jIMQ_X0IXDPXfI9oVWgq/view) directly)
+We follow the instruction from [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) to download the weights of teacher models pre-trained on CIFAR-10:
 ```
 $ cd ..
 $ git clone https://github.com/huyvnphan/PyTorch_CIFAR10.git
@@ -11,6 +11,7 @@ $ mv PyTorch_CIFAR10 cifar10_pretrained
 $ cd cifar10_pretrained
 $ python train.py --download_weights 1
 ```
+Alternatively, one can download the pre-trained weights directly from the [Google Drive](https://drive.google.com/file/d/17fmN8eQdLpq2jIMQ_X0IXDPXfI9oVWgq/view) link provided in [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) and unzip the file in `../cifar10_pretrained/`.
 
 ----------------
 

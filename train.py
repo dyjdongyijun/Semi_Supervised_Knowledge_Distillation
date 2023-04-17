@@ -76,6 +76,8 @@ def initiate_logging(args):
     wandb.init(
         project="FixMatch_RKD", 
         entity="mds-oden",
+        group=f"nl_{args.num_labeled}_pu_{args.percentunl}_m_{args.augstrength}",
+        job_type='training',
         reinit=True, 
         tags=['test_run'],
     )
@@ -289,6 +291,7 @@ def rkd_loss(args, features_model, features_teacher):
 
 def main():
     parser = argparse.ArgumentParser(description='PyTorch FixMatch Training')
+    parser.add_argument("--alert", type=int, default=0)
     parser.add_argument("--amp", action="store_true",
                         help="use 16-bit (mixed) precision through NVIDIA apex AMP")
     parser.add_argument('--arch', default='wideresnet', type=str,
@@ -386,6 +389,7 @@ def main():
     initiate_logging(args)
     # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     # args.writer = SummaryWriter(args.out)
+    
     
 
     # dataloaders
@@ -500,6 +504,12 @@ def main():
     model.zero_grad()
     train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
           model, optimizer, ema_model, scheduler, teacher)
+    
+    if args.alert:
+        wandb.alert(
+            title="Run Finished", 
+            text=f"group = {wandb.run.group}, labeler = {args.labeler}"
+        )
 
 
 def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
@@ -746,3 +756,4 @@ def test(args, test_loader, model, epoch):
 
 if __name__ == '__main__':
     main()
+    

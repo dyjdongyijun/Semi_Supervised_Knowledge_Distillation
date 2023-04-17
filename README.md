@@ -11,7 +11,7 @@ $ mv PyTorch_CIFAR10 cifar10_pretrained
 $ cd cifar10_pretrained
 $ python train.py --download_weights 1
 ```
-Alternatively, one can download the pre-trained weights directly from the [Google Drive](https://drive.google.com/file/d/17fmN8eQdLpq2jIMQ_X0IXDPXfI9oVWgq/view) link provided in [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) and unzip the file in `../cifar10_pretrained/`.
+Alternatively, one can download the pre-trained weights directly from the [Google Drive](https://drive.google.com/file/d/17fmN8eQdLpq2jIMQ_X0IXDPXfI9oVWgq/view) link provided in [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) and unzip the file in `../cifar10_pretrained/cifar10_models/`.
 
 ----------------
 

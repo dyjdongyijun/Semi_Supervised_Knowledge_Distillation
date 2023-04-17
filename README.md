@@ -1,17 +1,26 @@
 # Semi-supervised Relational Knowledge Distillation
 
-Based on semi-supervised learning via FixMatch adopted from the following [unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch)
+## Setup
+
+### Setup teacher models pre-trained on CIFAR-10
+We follow the instruction from [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) to download the weights of teacher models pre-trained on CIFAR-10:
+```
+$ cd ..
+$ git clone https://github.com/huyvnphan/PyTorch_CIFAR10.git
+$ mv PyTorch_CIFAR10 cifar10_pretrained
+$ cd cifar10_pretrained
+$ python train.py --download_weights 1
+```
+Alternatively, one can download the pre-trained weights directly from the [Google Drive](https://drive.google.com/file/d/17fmN8eQdLpq2jIMQ_X0IXDPXfI9oVWgq/view) link provided in [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) and unzip the file in `../cifar10_pretrained/cifar10_models/`.
 
 ----------------
-# FixMatch
-This is an unofficial PyTorch implementation of [FixMatch: Simplifying Semi-Supervised Learning with Consistency and Confidence](https://arxiv.org/abs/2001.07685).
-The official Tensorflow implementation is [here](https://github.com/google-research/fixmatch).
 
-This code is only available in FixMatch (RandAugment).
+## FixMatch
+Based on semi-supervised learning via FixMatch adopted from the following [Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch)
 
-## Results
+### Results
 
-### CIFAR10
+#### CIFAR10
 | #Labels | 40 | 250 | 4000 |
 |:---:|:---:|:---:|:---:|
 | Paper (RA) | 86.19 ± 3.37 | 94.93 ± 0.65 | 95.74 ± 0.05 |
@@ -19,7 +28,7 @@ This code is only available in FixMatch (RandAugment).
 | Acc. curve | [link](https://tensorboard.dev/experiment/YcLQA52kQ1KZIgND8bGijw/) | [link](https://tensorboard.dev/experiment/GN36hbbRTDaBPy7z8alE1A/) | [link](https://tensorboard.dev/experiment/5flaQd1WQyS727hZ70ebbA/) |
 
 \* November 2020. Retested after fixing EMA issues.
-### CIFAR100
+#### CIFAR100
 | #Labels | 400 | 2500 | 10000 |
 |:---:|:---:|:---:|:---:|
 | Paper (RA) | 51.15 ± 1.75 | 71.71 ± 0.11 | 77.40 ± 0.12 |
@@ -28,40 +37,21 @@ This code is only available in FixMatch (RandAugment).
 
 \* Training using the following options `--amp --opt_level O2 --wdecay 0.001`
 
+----------------
+
 ## Usage
 
 ### Train
-Train the model by 4000 labeled data of CIFAR-10 dataset:
 
 ```
-python train.py --dataset cifar10 --num-labeled 4000 --arch wideresnet --batch-size 64 --lr 0.03 --expand-labels --seed 5 --out results/cifar10@4000.5
+python 
 ```
 
-Train the model by 10000 labeled data of CIFAR-100 dataset by using DistributedDataParallel:
-```
-python -m torch.distributed.launch --nproc_per_node 4 ./train.py --dataset cifar100 --num-labeled 10000 --arch wideresnet --batch-size 16 --lr 0.03 --wdecay 0.001 --expand-labels --seed 5 --out results/cifar100@10000
-```
-
-### Monitoring training progress
-```
-tensorboard --logdir=<your out_dir>
-```
-
-## Requirements
-- python 3.6+
-- torch 1.4
-- torchvision 0.5
-- tensorboard
-- numpy
-- tqdm
-- apex (optional)
-
-## My other implementations
-- [Meta Pseudo Labels](https://github.com/kekmodel/MPL-pytorch)
-- [UDA for images](https://github.com/kekmodel/UDA-pytorch)
-
+----------------
 
 ## References
+- [Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch)
+- [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10)
 - [Official TensorFlow implementation of FixMatch](https://github.com/google-research/fixmatch)
 - [Unofficial PyTorch implementation of MixMatch](https://github.com/YU1ut/MixMatch-pytorch)
 - [Unofficial PyTorch Reimplementation of RandAugment](https://github.com/ildoonet/pytorch-randaugment)

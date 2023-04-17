@@ -75,10 +75,11 @@ def initiate_logging(args):
     
     wandb.init(
         project="FixMatch_RKD", 
-        entity="graph_based_ssl", 
+        entity="mds-oden", 
         reinit=True, 
         tags=['test_run'],
     )
+    
     wandb.run.name = args.exp_name
     wandb.config.update(args)
 
@@ -114,6 +115,9 @@ def process_config(args):
     # preprocess
     args.label_per_class = args.num_labeled//args.num_classes
     args.epochs = math.ceil(args.total_steps / args.eval_step)
+    if args.percentunl <= 0.0 or args.percentunl > 100:
+        print(f"args.percentunl = {args.percentunl} is invalid. Setting to default = 100")
+        args.percentunl = 100
     
     # tags 
     args.tags = config_dict.ConfigDict({
@@ -123,12 +127,15 @@ def process_config(args):
         'rkd': f'rkd-{args.rkd_edge}_{args.rkd_edge_min}_lambda{args.rkd_lambda:.1e}-p{args.rkd_norm:d}',
         'pretrain': f'{args.teacher_arch}_{args.teacher_data}_dim{args.teacher_dim:d}_{args.teacher_mode}',
         'train': f'lr{args.lr:.1e}_epo{args.epochs:d}_bs{args.batch_size:d}_wd{args.wdecay:.1e}',
-        'random': f'seed{args.seed:d}'
+        'random': f'seed{args.seed:d}',
+        'scalerkdloss': f'scalerkd{args.scale_rkd_loss}',
+        'percunl': f'percunl{args.percentunl}',
+        'augstrength': f'augstrength{args.augstrength}',
     })
     
     # exp_name
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d-%H%M")
-    args.exp_name = f'{args.tags.dataset}__{args.tags.arch}__{args.tags.dac}__{args.tags.rkd}__{args.tags.pretrain}__{args.tags.train}__{args.tags.random}__{timestamp}'
+    args.exp_name = f'{args.tags.dataset}__{args.tags.arch}__{args.tags.dac}__{args.tags.rkd}__{args.tags.pretrain}__{args.tags.train}__{args.tags.random}__{args.tags.scalerkdloss}__{args.tags.percunl}__{args.tags.augstrength}__{timestamp}'
     args.result_dir = os.path.join(args.out, args.exp_name)
     
     return args
@@ -287,6 +294,8 @@ def main():
     parser.add_argument('--arch', default='wideresnet', type=str,
                         choices=['wideresnet', 'resnext'], 
                         help='architecture name')
+    parser.add_argument('--augstrength', type=int, default=10, help='strength of augmentations in FixMatch',
+                       choices=[1,2,3,4,5,6,7,8,9,10])
     parser.add_argument('--batch_size', default=64, type=int,
                         help='train batchsize')
     parser.add_argument('--dataset', default='cifar10', type=str,
@@ -301,7 +310,7 @@ def main():
     parser.add_argument('--gpu_id', default='0', type=int,
                         help='id(s) for CUDA_VISIBLE_DEVICES')
     parser.add_argument('--labeler', default='class', type=str,
-                        choices=['unif', 'class', 'active'], 
+                        choices=['unif', 'class', 'active-fl', 'active-ls'], 
                         help='labele selection: unif=uniform over all samples / class=uniform per class / active=active learning')
     parser.add_argument('--lambda_u', default=1, type=float,
                         help='coefficient of unlabeled loss')
@@ -324,6 +333,7 @@ def main():
                         "See details at https://nvidia.github.io/apex/amp.html")
     parser.add_argument('--out', default=os.path.join('..','result'),
                         help='directory to output the result')
+    parser.add_argument('--percentunl', default=100, type=int, help='% of unlabeled dataset to consider')
     parser.add_argument('--pretrain_path', type=str, default=os.path.join('..','pretrained'),
                         help='path to pretrained model/features')
     parser.add_argument('--resume', default='', type=str,
@@ -339,6 +349,7 @@ def main():
                         choices=[1,2], help='order of the norm for RKD loss')
     parser.add_argument('--root', type=str, default=os.path.join('..','data'), 
                         help='path to data source')
+    parser.add_argument('--scale_rkd_loss', type=str, default='', help='flag for scaling RKD loss by magnitude of FM loss.', choices=['', 'naive', 'naive2'])
     parser.add_argument('--seed', default=42, type=int,
                         help="random seed")
     parser.add_argument('--start_epoch', default=0, type=int,
@@ -375,6 +386,7 @@ def main():
     initiate_logging(args)
     # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     # args.writer = SummaryWriter(args.out)
+    
 
     # dataloaders
     if args.local_rank not in [-1, 0]:
@@ -582,8 +594,16 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             else:
                 Lkd = torch.Tensor([0.0]).to(args.device)
 
+            # if want to scale RKD loss to be on par with FM loss
+            if args.scale_rkd_loss == 'naive':
+                Lu_scaling = Lu.detach().item()
+            elif args.scale_rkd_loss == 'naive2':
+                Lu_scaling = Lu.detach().item() / args.rkd_lambda
+            else:
+                Lu_scaling = 1.0
+                
             # loss
-            loss = Lx + args.lambda_u * Lu + args.rkd_lambda * Lkd
+            loss = Lx + args.lambda_u * Lu + args.rkd_lambda * Lkd * Lu_scaling
 
             if args.amp:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -690,7 +710,7 @@ def test(args, test_loader, model, epoch):
         data_time.update(time.time() - end)
         model.eval()
         
-        inputs = inputs.repeat(1, 3, 1, 1)   # hack to get this to have 3 channels like training data
+#         inputs = inputs.repeat(1, 3, 1, 1)   # hack to get this to have 3 channels like training data for fashionmnist
         inputs = inputs.to(args.device)
         targets = targets.to(args.device)
         outputs = model(inputs)

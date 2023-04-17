@@ -1,12 +1,20 @@
 import logging
 import math
 
+
 import numpy as np
 from PIL import Image
 from torchvision import datasets
 from torchvision import transforms
 
 from .randaugment import RandAugmentMC
+
+
+import os
+import torch
+from apricot import FacilityLocationSelection
+import IPython
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +24,11 @@ cifar100_mean = (0.5071, 0.4867, 0.4408)
 cifar100_std = (0.2675, 0.2565, 0.2761)
 normal_mean = (0.5, 0.5, 0.5)
 normal_std = (0.5, 0.5, 0.5)
+
+def get_offline_teacher(args):
+    pretrained_name = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}{args.teacher_dim:d}.pt')
+    teacher = torch.load(pretrained_name)[:args.num_train]
+    return teacher.float()
 
 
 def get_cifar10(args, root):
@@ -43,7 +56,7 @@ def get_cifar10(args, root):
 
     train_unlabeled_dataset = CIFAR10SSL(
         root, train_unlabeled_idxs, train=True,
-        transform=TransformFixMatch(mean=cifar10_mean, std=cifar10_std), 
+        transform=TransformFixMatch(mean=cifar10_mean, std=cifar10_std, m=args.augstrength), 
         return_idx=True,
     )
 
@@ -82,7 +95,7 @@ def get_cifar100(args, root):
 
     train_unlabeled_dataset = CIFAR100SSL(
         root, train_unlabeled_idxs, train=True,
-        transform=TransformFixMatch(mean=cifar100_mean, std=cifar100_std),
+        transform=TransformFixMatch(mean=cifar100_mean, std=cifar100_std, m=args.augstrength),
         return_idx=True,
     )
 
@@ -98,7 +111,9 @@ def x_u_split(args, labels):
     labels = np.array(labels)
     
     # unlabeled data: all data (https://github.com/kekmodel/FixMatch-pytorch/issues/10)
-    unlabeled_idx = np.array(range(len(labels)))
+    unlabeled_idx = np.arange(labels.size)
+    if args.percentunl < 100.:
+        unlabeled_idx = np.sort(np.random.choice(unlabeled_idx, int(unlabeled_idx.size * float(args.percentunl) / 100.), replace=False))
     
     # label selection
     if args.labeler=='unif':
@@ -110,6 +125,42 @@ def x_u_split(args, labels):
             idx = np.random.choice(idx, label_per_class, False)
             labeled_idx.extend(idx)
         labeled_idx = np.array(labeled_idx)
+    elif args.labeler.split('-')[0] == 'active':
+        teacher = get_offline_teacher(args)
+        fname = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}{args.teacher_dim:d}_{args.labeler}.npy')
+        print(f"Checking if have previously cached results for args.labeler = {args.labeler} at: \n\t{fname}")
+        
+        found = False
+        try:
+            labeled_idx = np.load(fname)
+            print("\tFOUND")
+            found = True
+        except:
+            print(f"Could not find saved labeled indices at {fname}, proceeding to compute and save accordingly...")
+        
+        if not found:
+            if args.labeler.split('-')[1] == 'ls':
+                # leverage scores 
+                row_norms = (teacher * teacher).sum(dim=1)
+                labeled_idx = np.random.choice(labels, args.num_labeled, False, p=row_norms/row_norms.sum())
+
+            elif args.labeler.split('-')[1] == 'fl':
+                # vopt (facility location)
+                tic = time.time()
+                selector = FacilityLocationSelection(args.num_labeled, metric='cosine', optimizer='stochastic')
+                selector.fit(teacher.detach().numpy())
+                toc = time.time()
+                print(f"\tTime to select subset via {args.labeler} = {toc - tic}")
+                labeled_idx = selector.ranking
+
+            else:
+                raise Exception(f'args.labeler = {args.labeler} not found')
+
+            # save labeled indices 
+            np.save(fname, labeled_idx)
+            print("\tsaved!")
+        
+        
     else:
         raise Exception(f'args.labeler = {args.labeler} not found')
     assert len(labeled_idx) == args.num_labeled
@@ -123,7 +174,7 @@ def x_u_split(args, labels):
 
 
 class TransformFixMatch(object):
-    def __init__(self, mean, std):
+    def __init__(self, mean, std, m=10):
         self.weak = transforms.Compose([
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(size=32,
@@ -134,7 +185,7 @@ class TransformFixMatch(object):
             transforms.RandomCrop(size=32,
                                   padding=int(32*0.125),
                                   padding_mode='reflect'),
-            RandAugmentMC(n=2, m=10)])
+            RandAugmentMC(n=2, m=m)])
         self.normalize = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=mean, std=std)])
@@ -154,10 +205,11 @@ class CIFAR10SSL(datasets.CIFAR10):
                          target_transform=target_transform,
                          download=download)
         self.return_idx = return_idx
+        self.indices = indexs
         if indexs is not None:
             self.data = self.data[indexs]
             self.targets = np.array(self.targets)[indexs]
-            self.indices = np.arange(len(self.targets))[indexs]
+            
 
     def __getitem__(self, index):
         img, target = self.data[index], self.targets[index]

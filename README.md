@@ -3,7 +3,7 @@
 ## Setup
 
 ### Setup teacher models pre-trained on CIFAR-10
-We follow the instruction from [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) to download the weights of teacher models pre-trained on CIFAR-10:
+We follow the instruction from [fbuchert: Unofficial PyTorch implementation of FixMatch](https://github.com/fbuchert/fixmatch-pytorch) and [kekmodel: Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch) to download the weights of teacher models pre-trained on CIFAR-10:
 ```
 $ cd ..
 $ git clone https://github.com/huyvnphan/PyTorch_CIFAR10.git
@@ -50,7 +50,8 @@ python
 ----------------
 
 ## References
-- [Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch)
+- [fbuchert: Unofficial PyTorch implementation of FixMatch](https://github.com/fbuchert/fixmatch-pytorch)
+- [kekmodel: Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch)
 - [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10)
 - [Official TensorFlow implementation of FixMatch](https://github.com/google-research/fixmatch)
 - [Unofficial PyTorch implementation of MixMatch](https://github.com/YU1ut/MixMatch-pytorch)

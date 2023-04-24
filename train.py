@@ -130,7 +130,7 @@ def process_config(args):
         'pretrain': f'{args.teacher_arch}_{args.teacher_data}_dim{args.teacher_dim:d}_{args.teacher_mode}',
         'train': f'lr{args.lr:.1e}_epo{args.epochs:d}_bs{args.batch_size:d}_wd{args.wdecay:.1e}',
         'random': f'seed{args.seed:d}',
-        'scalerkdloss': f'scalerkd{args.scale_rkd_loss}',
+        'scalerkdloss': f'scalerkd{args.rkd_downweight}',
         'percunl': f'percunl{args.percentunl}',
         'augstrength': f'augstrength{args.augstrength}',
     })
@@ -228,7 +228,7 @@ def create_model(args):
 
 
 def get_offline_teacher(args):
-    pretrained_name = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}{args.teacher_dim:d}.pt')
+    pretrained_name = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}_dim{args.teacher_dim:d}.pt')
     teacher = torch.load(pretrained_name)[:args.num_train]
     return teacher.float()
     
@@ -341,6 +341,9 @@ def main():
                         help='path to pretrained model/features')
     parser.add_argument('--resume', default='', type=str,
                         help='path to latest checkpoint (default: none)')
+    parser.add_argument('--rkd_downweight', type=str, default='', 
+                        choices=['', 'mask', 'naive', 'naive2'],
+                        help='flag for scaling RKD loss by magnitude of FM loss.',)
     parser.add_argument('--rkd_edge', default='cos', type=str,
                         choices=['cos', 'maxmatch'], 
                         help='edges of data graph that characterize pair-wise relation between samples: cos(u,v) = (normalized(t(u),2) * normalized(t(v),2)).sum / maxmatch(u,v) = argmax(t(u))==argmax(t(v))')
@@ -348,11 +351,12 @@ def main():
                         help='sparsification of data graph: w_e = (w_e >= rkd_tol) * w_e [note w_e >= 0]')
     parser.add_argument('--rkd_lambda', default=0.0, type=float,
                         help='coefficient of relational knowledge distillation loss')
+    parser.add_argument('--rkd_mask_clip', type=float, default=0.05, 
+                        help='when rkd_downweight==mask: max mask probability drop beyond which rkd_lambda decays',)
     parser.add_argument('--rkd_norm', default=2, type=int,
                         choices=[1,2], help='order of the norm for RKD loss')
     parser.add_argument('--root', type=str, default=os.path.join('..','data'), 
                         help='path to data source')
-    parser.add_argument('--scale_rkd_loss', type=str, default='', help='flag for scaling RKD loss by magnitude of FM loss.', choices=['', 'naive', 'naive2'])
     parser.add_argument('--seed', default=42, type=int,
                         help="random seed")
     parser.add_argument('--start_epoch', default=0, type=int,
@@ -360,7 +364,7 @@ def main():
     parser.add_argument('--T', default=1, type=float,
                         help='pseudo label temperature')
     parser.add_argument('--teacher_arch', type=str, default='densenet161', 
-                        choices=['densenet161', 'resnet152', 'wide_resnet101_2'],
+                        choices=['densenet161'],
                         help='teacher architecture')
     parser.add_argument('--teacher_data', type=str, default='cifar10', 
                         choices=['cifar10', 'imagenet'],
@@ -538,11 +542,11 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
         losses_u = AverageMeter()
         losses_rkd = AverageMeter()
         mask_probs = AverageMeter()
+        mask_prob_max = 0.0
         description = ""
         
         if not args.no_progress:
-            p_bar = tqdm(range(args.eval_step),
-                         disable=args.local_rank not in [-1, 0])
+            p_bar = tqdm(range(args.eval_step), disable=args.local_rank not in [-1, 0])
             
         for batch_idx in range(args.eval_step):
             try:
@@ -590,6 +594,8 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             pseudo_label = torch.softmax(logits_u_w.detach()/args.T, dim=-1)
             max_probs, targets_u = torch.max(pseudo_label, dim=-1)
             mask = max_probs.ge(args.threshold).float()
+            mask_prob = mask.mean().item()
+            mask_prob_max = max(mask_prob_max, mask_prob)
             Lu = (F.cross_entropy(logits_u_s, targets_u, reduction='none') * mask).mean()
             
             # rkd loss
@@ -605,15 +611,17 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 Lkd = torch.Tensor([0.0]).to(args.device)
 
             # if want to scale RKD loss to be on par with FM loss
-            if args.scale_rkd_loss == 'naive':
-                Lu_scaling = Lu.detach().item()
-            elif args.scale_rkd_loss == 'naive2':
-                Lu_scaling = Lu.detach().item() / args.rkd_lambda
+            if args.rkd_downweight == 'mask':
+                rkd_dw = (args.rkd_lambda)**((mask_prob_max-mask_prob)/args.rkd_mask_clip*(mask_prob_max-mask_prob>args.rkd_mask_clip))
+            elif args.rkd_downweight == 'naive':
+                rkd_dw = Lu.detach().item()
+            elif args.rkd_downweight == 'naive2':
+                rkd_dw = Lu.detach().item() / args.rkd_lambda
             else:
-                Lu_scaling = 1.0
+                rkd_dw = 1.0
                 
             # loss
-            loss = Lx + args.lambda_u * Lu + args.rkd_lambda * Lkd * Lu_scaling
+            loss = Lx + args.lambda_u * Lu + rkd_dw * args.rkd_lambda * Lkd
 
             if args.amp:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -633,7 +641,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
 
             batch_time.update(time.time() - end)
             end = time.time()
-            mask_probs.update(mask.mean().item())
+            mask_probs.update(mask_prob)
             
             description = "Train Epoch: {epoch}/{epochs:4}. Iter: {batch:4}/{iter:4}. LR: {lr:.4f}. Data: {data:.3f}s. Batch: {bt:.3f}s. Loss: {loss:.4f}. Loss_x: {loss_x:.4f}. Loss_u: {loss_u:.4f}. Mask: {mask:.2f}. ".format(
                 epoch=epoch + 1,

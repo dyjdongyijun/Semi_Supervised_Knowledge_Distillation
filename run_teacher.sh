@@ -1,5 +1,4 @@
 #!/bin/bash
-# wandb artifact cache cleanup 16MB
 
 dataset=cifar10
 batch_size=10000

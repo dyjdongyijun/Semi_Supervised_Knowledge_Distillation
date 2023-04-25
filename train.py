@@ -351,7 +351,7 @@ def main():
                         help='sparsification of data graph: w_e = (w_e >= rkd_tol) * w_e [note w_e >= 0]')
     parser.add_argument('--rkd_lambda', default=0.0, type=float,
                         help='coefficient of relational knowledge distillation loss')
-    parser.add_argument('--rkd_mask_clip', type=float, default=0.05, 
+    parser.add_argument('--rkd_mask_clip', type=float, default=0.2, 
                         help='when rkd_downweight==mask: max mask probability drop beyond which rkd_lambda decays',)
     parser.add_argument('--rkd_norm', default=2, type=int,
                         choices=[1,2], help='order of the norm for RKD loss')
@@ -612,7 +612,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
 
             # if want to scale RKD loss to be on par with FM loss
             if args.rkd_downweight == 'mask':
-                rkd_dw = (args.rkd_lambda)**((mask_prob_max-mask_prob)/args.rkd_mask_clip*(mask_prob_max-mask_prob>args.rkd_mask_clip))
+                rkd_dw = (args.rkd_lambda)**((mask_prob_max-mask_prob)*(mask_prob_max-mask_prob>args.rkd_mask_clip))
             elif args.rkd_downweight == 'naive':
                 rkd_dw = Lu.detach().item()
             elif args.rkd_downweight == 'naive2':

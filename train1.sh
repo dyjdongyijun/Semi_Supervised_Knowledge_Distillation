@@ -6,11 +6,9 @@
 
 # Get the output of nvidia-smi with GPU memory information
 output=$(nvidia-smi --query-gpu=index,memory.free --format=csv,noheader)
-
 # Initialize variables for tracking the maximum free memory and its corresponding GPU ID
 max_free_memory=-1
 max_free_memory_gpu_id=-1
-
 # Iterate through each line of the output to find the GPU with the maximum free memory
 while IFS= read -r line; do
     gpu_id=$(echo $line | cut -d',' -f1)

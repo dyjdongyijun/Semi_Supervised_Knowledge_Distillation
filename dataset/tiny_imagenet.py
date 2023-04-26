@@ -58,8 +58,8 @@ class TinyImageNet(Dataset):
         
         self.images, self.labels = self._load_images_labels()
         if indexs is not None:
-            self.images = self.images[indexs]
-            self.targets = np.array(self.targets)[indexs]
+            self.images = [self.images[i] for i in indexs]
+            self.labels = np.array(self.labels)[indexs]
 
     def _load_images_labels(self):
         images, labels = [], []

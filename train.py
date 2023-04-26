@@ -25,7 +25,7 @@ import torchvision.models as tvmodels
 sys.path.append('..')
 from cifar10_pretrained.cifar10_models import resnet, densenet, mobilenetv2
 
-from dataset.cifar import get_cifar10, get_cifar100
+from dataset.cifar import get_cifar10, get_cifar100, get_offline_teacher
 from dataset.fashionmnist import get_fashionmnist
 from dataset.tiny_imagenet import get_tiny_imagenet
 from utils import AverageMeter, accuracy
@@ -131,10 +131,10 @@ def process_config(args):
     # tags 
     args.tags = config_dict.ConfigDict({
         'dataset': f'{args.dataset}_ncls{args.num_classes}_lpc{args.label_per_class}_{args.labeler}',
-        'arch': f'{args.arch}-' + 'x'.join(map(str, args.input_dim)) + '-' + '-'.join(map(str, args.hidden_dim)),
-        'dac': f'fixmatch_lambda-u{args.lambda_u:.1e}_pslab-thres{args.threshold:.2f}',
+        'arch': f'{args.arch}', #+ 'x'.join(map(str, args.input_dim)) + '-' + '-'.join(map(str, args.hidden_dim)),
+        # 'dac': f'fixmatch_lambda-u{args.lambda_u:.1e}_pslab-thres{args.threshold:.2f}',
         'rkd': f'rkd-{args.rkd_edge}_{args.rkd_edge_min}_lambda{args.rkd_lambda:.1e}-p{args.rkd_norm:d}',
-        'pretrain': f'{args.teacher_arch}_{args.teacher_data}_dim{args.teacher_dim:d}_{args.teacher_mode}',
+        'pretrain': f'{args.teacher_arch}_{args.teacher_pretrain}_dim{args.teacher_dim:d}_{args.teacher_mode}',
         'train': f'lr{args.lr:.1e}_epo{args.epochs:d}_bs{args.batch_size:d}_wd{args.wdecay:.1e}',
         'random': f'seed{args.seed:d}',
         'scalerkdloss': f'scalerkd{args.rkd_downweight}',
@@ -144,7 +144,7 @@ def process_config(args):
     
     # exp_name
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d-%H%M")
-    args.exp_name = f'{args.tags.dataset}__{args.tags.arch}__{args.tags.dac}__{args.tags.rkd}__{args.tags.pretrain}__{args.tags.train}__{args.tags.random}__{args.tags.scalerkdloss}__{args.tags.percunl}__{args.tags.augstrength}__{timestamp}'
+    args.exp_name = f'{args.tags.dataset}__{args.tags.arch}__{args.tags.rkd}__{args.tags.pretrain}__{args.tags.train}__{args.tags.random}__{args.tags.scalerkdloss}__{args.tags.percunl}__{args.tags.augstrength}__{timestamp}'
     args.result_dir = os.path.join(args.out, args.exp_name)
     
     return args
@@ -249,19 +249,13 @@ def create_model(args):
     return model
 
 
-def get_offline_teacher(args):
-    pretrained_name = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}_dim{args.teacher_dim:d}.pt')
-    teacher = torch.load(pretrained_name)[:args.num_train]
-    return teacher.float()
-    
-
 def get_online_teacher(args):
     if args.teacher_pretrain=='swav': # contrastive pretraining
         model = SWAV_MODEL_DICT[args.teacher_arch](args.teacher_arch)
-    elif args.teacher_data=='imagenet':
+    elif args.teacher_pretrain=='imagenet':
         teacher_model, pretrained_weights = IMAGENET_MODEL_DICT[args.teacher_arch]
         teacher = teacher_model(weights=pretrained_weights)
-    elif args.teacher_data=='cifar10':
+    elif args.teacher_pretrain=='cifar10':
         teacher = CIFAR10_MODEL_DICT[args.teacher_arch](pretrained=True)
     else:
         raise Exception(f'args.teacher_pretrain = {args.teacher_pretrain} not found')
@@ -343,7 +337,7 @@ def main():
                         "See details at https://nvidia.github.io/apex/amp.html")
     parser.add_argument('--out', default=os.path.join('..','result'),
                         help='directory to output the result')
-    parser.add_argument('--percentunl', default=100, type=int, help='% of unlabeled dataset to consider')
+    parser.add_argument('--percentunl', default=100, type=int, help='percent of unlabeled dataset to consider')
     parser.add_argument('--pretrain_path', type=str, default=os.path.join('..','pretrained'),
                         help='path to pretrained model/features')
     parser.add_argument('--resume', default='', type=str,
@@ -371,11 +365,11 @@ def main():
     parser.add_argument('--T', default=1, type=float,
                         help='pseudo label temperature')
     parser.add_argument('--teacher_arch', type=str, default='densenet161', 
-                        choices=['densenet161'],
+                        choices=['densenet161','resnet50','resnet50w2','resnet50w5'],
                         help='teacher architecture')
-    parser.add_argument('--teacher_data', type=str, default='cifar10', 
-                        choices=['cifar10', 'imagenet'],
-                        help='pretrained source of teacher models')
+    parser.add_argument('--teacher_pretrain', type=str, default='cifar10', 
+                        choices=['cifar10', 'imagenet', 'swav'],
+                        help='pretrained methods of teacher models')
     parser.add_argument('--teacher_dim', type=int, default=10, 
                         help='dimension of pretrained features')
     parser.add_argument('--teacher_mode', type=str, default='offline', 
@@ -383,7 +377,7 @@ def main():
                         help='model of feature extraction: offline=load cached features of original data / online=online feature evaluation for augmented data')
     parser.add_argument('--threshold', default=0.95, type=float,
                         help='pseudo label threshold')
-    parser.add_argument('--total_steps', default=2**20, type=int,
+    parser.add_argument('--total_steps', default=2**17, type=int,
                         help='number of total steps to run')
     parser.add_argument('--use_ema', action='store_false', default=True,
                         help='not use EMA model (use by default)')
@@ -401,8 +395,6 @@ def main():
     # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     # args.writer = SummaryWriter(args.out)
     
-    
-
     # dataloaders
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()

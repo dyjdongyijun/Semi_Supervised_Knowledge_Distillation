@@ -34,7 +34,7 @@ cifar100_config = {
 
 
 def get_offline_teacher(args):
-    pretrained_name = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}{args.teacher_dim:d}.pt')
+    pretrained_name = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_pretrain}_dim{args.teacher_dim:d}.pt')
     teacher = torch.load(pretrained_name)[:args.num_train]
     return teacher.float()
 
@@ -136,7 +136,7 @@ def x_u_split(args, labels):
         labeled_idx = np.array(labeled_idx)
     elif args.labeler.split('-')[0] == 'active':
         teacher = get_offline_teacher(args)
-        fname = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}{args.teacher_dim:d}_{args.labeler}_{args.num_labeled}.npy')
+        fname = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_pretrain}{args.teacher_dim:d}_{args.labeler}_{args.num_labeled}.npy')
         print(f"Checking if have previously cached results for args.labeler = {args.labeler} at: \n\t{fname}")
         
         found = False

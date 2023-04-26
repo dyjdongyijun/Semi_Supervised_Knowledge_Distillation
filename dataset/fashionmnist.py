@@ -155,7 +155,3 @@ class FashionMNISTSSL(datasets.FashionMNIST):
         else:
             return img, target
 
-
-
-
-DATASET_GETTERS_fashionmnist = {'fashionmnist': get_fashionmnist}

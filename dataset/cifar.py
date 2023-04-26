@@ -18,12 +18,20 @@ import time
 
 logger = logging.getLogger(__name__)
 
-cifar10_mean = (0.4914, 0.4822, 0.4465)
-cifar10_std = (0.2471, 0.2435, 0.2616)
-cifar100_mean = (0.5071, 0.4867, 0.4408)
-cifar100_std = (0.2675, 0.2565, 0.2761)
-normal_mean = (0.5, 0.5, 0.5)
-normal_std = (0.5, 0.5, 0.5)
+cifar10_config = {
+    'mean': (0.4914, 0.4822, 0.4465),
+    'std': (0.2471, 0.2435, 0.2616),
+    'size': 32,
+    'ncls': 10,
+}
+
+cifar100_config = {
+    'mean': (0.5071, 0.4867, 0.4408),
+    'std': (0.2675, 0.2565, 0.2761),
+    'size': 32,
+    'ncls': 100,
+}
+
 
 def get_offline_teacher(args):
     pretrained_name = os.path.join(args.pretrain_path, args.dataset, f'{args.teacher_arch}_{args.teacher_data}{args.teacher_dim:d}.pt')
@@ -31,19 +39,24 @@ def get_offline_teacher(args):
     return teacher.float()
 
 
-def get_cifar10(args, root):
+def train_val_transforms(data_config):
     transform_labeled = transforms.Compose([
         transforms.RandomHorizontalFlip(),
-        transforms.RandomCrop(size=32,
-                              padding=int(32*0.125),
+        transforms.RandomCrop(size=data_config['size'],
+                              padding=int(data_config['size']*0.125),
                               padding_mode='reflect'),
         transforms.ToTensor(),
-        transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+        transforms.Normalize(mean=data_config['mean'], std=data_config['std'])
     ])
     transform_val = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+        transforms.Normalize(mean=data_config['mean'], std=data_config['std'])
     ])
+    return transform_labeled, transform_val
+
+
+def get_cifar10(args, root):
+    transform_labeled, transform_val = train_val_transforms(cifar10_config)
     base_dataset = datasets.CIFAR10(root, train=True, download=True)
 
     train_labeled_idxs, train_unlabeled_idxs = x_u_split(
@@ -56,7 +69,11 @@ def get_cifar10(args, root):
 
     train_unlabeled_dataset = CIFAR10SSL(
         root, train_unlabeled_idxs, train=True,
-        transform=TransformFixMatch(mean=cifar10_mean, std=cifar10_std, m=args.augstrength), 
+        transform=TransformFixMatch(
+            mean=cifar10_config['mean'], 
+            std=cifar10_config['std'], 
+            size=cifar10_config['size'], 
+            m=args.augstrength), 
         return_idx=True,
     )
 
@@ -68,19 +85,7 @@ def get_cifar10(args, root):
 
 
 def get_cifar100(args, root):
-
-    transform_labeled = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomCrop(size=32,
-                              padding=int(32*0.125),
-                              padding_mode='reflect'),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=cifar100_mean, std=cifar100_std)])
-
-    transform_val = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=cifar100_mean, std=cifar100_std)])
-
+    transform_labeled, transform_val = train_val_transforms(cifar100_config)
     base_dataset = datasets.CIFAR100(
         root, train=True, download=True)
 
@@ -95,7 +100,11 @@ def get_cifar100(args, root):
 
     train_unlabeled_dataset = CIFAR100SSL(
         root, train_unlabeled_idxs, train=True,
-        transform=TransformFixMatch(mean=cifar100_mean, std=cifar100_std, m=args.augstrength),
+        transform=TransformFixMatch(
+            mean=cifar100_config['mean'], 
+            std=cifar100_config['std'], 
+            size=cifar100_config['size'],
+            m=args.augstrength),
         return_idx=True,
     )
 
@@ -174,16 +183,16 @@ def x_u_split(args, labels):
 
 
 class TransformFixMatch(object):
-    def __init__(self, mean, std, m=10):
+    def __init__(self, mean, std, size, m=10):
         self.weak = transforms.Compose([
             transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(size=32,
-                                  padding=int(32*0.125),
+            transforms.RandomCrop(size=size,
+                                  padding=int(size*0.125),
                                   padding_mode='reflect')])
         self.strong = transforms.Compose([
             transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(size=32,
-                                  padding=int(32*0.125),
+            transforms.RandomCrop(size=size,
+                                  padding=int(size*0.125),
                                   padding_mode='reflect'),
             RandAugmentMC(n=2, m=m)])
         self.normalize = transforms.Compose([
@@ -255,6 +264,3 @@ class CIFAR100SSL(datasets.CIFAR100):
         else:
             return img, target
 
-
-DATASET_GETTERS = {'cifar10': get_cifar10,
-                   'cifar100': get_cifar100}

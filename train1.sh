@@ -4,9 +4,9 @@
 # wandb sync
 # wandb sync --clean
 
-dataset=cifar10
-num_labeled=40
-teacher_arch=densenet161
+dataset=timagenet200
+num_labeled=800
+teacher_arch=resnet50w5
 rkd_lambda=1e-3
 rkd_edge=cos
 total_steps=$[2**17]

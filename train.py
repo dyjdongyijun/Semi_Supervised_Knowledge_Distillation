@@ -20,19 +20,26 @@ from torch.utils.data.distributed import DistributedSampler
 # from torch.utils.tensorboard import SummaryWriter
 import wandb
 from tqdm import tqdm
-
 import torchvision.models as tvmodels
 # ref: https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10
 sys.path.append('..')
 from cifar10_pretrained.cifar10_models import resnet, densenet, mobilenetv2
 
-from dataset.cifar import DATASET_GETTERS
-from dataset.fashionmnist import DATASET_GETTERS_fashionmnist
+from dataset.cifar import get_cifar10, get_cifar100
+from dataset.fashionmnist import get_fashionmnist
+from dataset.tiny_imagenet import get_tiny_imagenet
 from utils import AverageMeter, accuracy
+from teach import SWAV_MODEL_DICT, IMAGENET_MODEL_DICT, CIFAR10_MODEL_DICT
 
 logger = logging.getLogger(__name__)
 best_acc = 0
 
+DATASET_GETTERS = {
+    'cifar10': get_cifar10,
+    'cifar100': get_cifar100,
+    'fashionmnist': get_fashionmnist,
+    'timagenet200': get_tiny_imagenet,
+}
 
 def save_checkpoint(state, is_best, checkpoint, filename='checkpoint.pth.tar'):
     filepath = os.path.join(checkpoint, filename)
@@ -205,6 +212,21 @@ def model_config(args):
             args.model_depth = 28
             args.model_width = 4
 
+    elif args.dataset == 'timagenet200':
+        args.num_classes = 200
+        args.input_dim = [3, 64, 64]
+        args.num_train = 100000
+        args.num_test = 10000
+        if args.arch == 'wideresnet':
+            args.hidden_dim = [200]
+            args.model_depth = 28
+            args.model_width = 8
+        elif args.arch == 'resnext':
+            args.hidden_dim = [200]
+            args.model_cardinality = 8
+            args.model_depth = 29
+            args.model_width = 64
+
     return args
 
 
@@ -233,25 +255,10 @@ def get_offline_teacher(args):
     return teacher.float()
     
 
-IMAGENET_MODEL_DICT = {
-    'resnet18': (tvmodels.resnet18, 'IMAGENET1K_V1'),
-    'resnet152': (tvmodels.resnet152, 'IMAGENET1K_V2'),
-    'wide_resnet101_2': (tvmodels.wide_resnet101_2, 'IMAGENET1K_V2'),
-    'regnet_y_128gf': (tvmodels.regnet_y_128gf, 'IMAGENET1K_SWAG_E2E_V1'),
-}
-
-CIFAR10_MODEL_DICT = {
-    'resnet18': resnet.resnet18,
-    'resnet34': resnet.resnet34,
-    'resnet50': resnet.resnet50,
-    'densenet121': densenet.densenet121,
-    'densenet169': densenet.densenet169,
-    'densenet161': densenet.densenet161,
-    'mobilenet_v2': mobilenetv2.mobilenet_v2,
-}
-
 def get_online_teacher(args):
-    if args.teacher_data=='imagenet':
+    if args.teacher_pretrain=='swav': # contrastive pretraining
+        model = SWAV_MODEL_DICT[args.teacher_arch](args.teacher_arch)
+    elif args.teacher_data=='imagenet':
         teacher_model, pretrained_weights = IMAGENET_MODEL_DICT[args.teacher_arch]
         teacher = teacher_model(weights=pretrained_weights)
     elif args.teacher_data=='cifar10':
@@ -302,7 +309,7 @@ def main():
     parser.add_argument('--batch_size', default=64, type=int,
                         help='train batchsize')
     parser.add_argument('--dataset', default='cifar10', type=str,
-                        choices=['cifar10', 'cifar100', 'fashionmnist'], 
+                        choices=['cifar10', 'cifar100', 'fashionmnist', 'timagenet200'], 
                         help='dataset name')
     parser.add_argument('--ema_decay', default=0.999, type=float,
                         help='EMA decay rate')
@@ -400,10 +407,7 @@ def main():
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()
     
-    if args.dataset == 'fashionmnist':
-        labeled_dataset, unlabeled_dataset, test_dataset = DATASET_GETTERS_fashionmnist['fashionmnist'](args, args.root)
-    else:
-        labeled_dataset, unlabeled_dataset, test_dataset = DATASET_GETTERS[args.dataset](args, args.root)
+    labeled_dataset, unlabeled_dataset, test_dataset = DATASET_GETTERS[args.dataset](args, args.root)
 
     if args.local_rank == 0:
         torch.distributed.barrier()
@@ -612,7 +616,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
 
             # if want to scale RKD loss to be on par with FM loss
             if args.rkd_downweight == 'mask':
-                rkd_dw = (args.rkd_lambda)**((mask_prob_max-mask_prob)*(mask_prob_max-mask_prob>args.rkd_mask_clip))
+                rkd_dw = math.exp(-(mask_prob_max-mask_prob)/args.rkd_mask_clip*(mask_prob_max-mask_prob>args.rkd_mask_clip))
             elif args.rkd_downweight == 'naive':
                 rkd_dw = Lu.detach().item()
             elif args.rkd_downweight == 'naive2':

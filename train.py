@@ -226,7 +226,16 @@ def model_config(args):
             args.model_cardinality = 8
             args.model_depth = 29
             args.model_width = 64
+    return args
 
+
+def teacher_config(args):
+    teacher_dim_dict = {
+        'cifar10': 10,
+        'imagenet': 1000,
+        'swav': 1000,
+    }
+    args.teacher_dim = teacher_dim_dict[args.teacher_pretrain]
     return args
 
 
@@ -370,8 +379,6 @@ def main():
     parser.add_argument('--teacher_pretrain', type=str, default='cifar10', 
                         choices=['cifar10', 'imagenet', 'swav'],
                         help='pretrained methods of teacher models')
-    parser.add_argument('--teacher_dim', type=int, default=10, 
-                        help='dimension of pretrained features')
     parser.add_argument('--teacher_mode', type=str, default='offline', 
                         choices=['offline', 'online'],
                         help='model of feature extraction: offline=load cached features of original data / online=online feature evaluation for augmented data')
@@ -389,6 +396,7 @@ def main():
     args = parser.parse_args()
     args = device_config(args)
     args = model_config(args)
+    args = teacher_config(args)
     args = process_config(args)
     set_seed(args)
     initiate_logging(args)
@@ -672,19 +680,6 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             is_best = test_acc > best_acc
             best_acc = max(test_acc, best_acc)
 
-            wandb.log({
-                'epoch': epoch + 1,
-                'train_loss': losses.avg,
-                'train_loss_x': losses_x.avg,
-                'train_loss_u': losses_u.avg,
-                'train_loss_rkd': losses_rkd.avg,
-                'mask': mask_probs.avg,
-                'test_acc_1': test_acc,
-                'test_acc_1_best': best_acc,
-                'test_acc_5': top5,
-                'test_loss': test_loss,
-            })
-
             model_to_save = model.module if hasattr(model, "module") else model
             if args.use_ema:
                 ema_to_save = ema_model.ema.module if hasattr(
@@ -702,6 +697,20 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             test_accs.append(test_acc)
             logger.info('Best top-1 acc: {:.2f}'.format(best_acc))
             logger.info('Mean top-1 acc: {:.2f}\n'.format(np.mean(test_accs[-20:])))
+            
+            wandb.log({
+                'epoch': epoch + 1,
+                'train_loss': losses.avg,
+                'train_loss_x': losses_x.avg,
+                'train_loss_u': losses_u.avg,
+                'train_loss_rkd': losses_rkd.avg,
+                'mask': mask_probs.avg,
+                'test_acc_1': test_acc,
+                'test_acc_1_best': best_acc,
+                'test_acc_1_avg20': np.mean(test_accs[-20:]),
+                'test_acc_5': top5,
+                'test_loss': test_loss,
+            })
 
     if args.local_rank in [-1, 0]:
         wandb.finish()

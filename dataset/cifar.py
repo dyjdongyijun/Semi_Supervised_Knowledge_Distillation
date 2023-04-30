@@ -86,8 +86,7 @@ def get_cifar10(args, root):
 
 def get_cifar100(args, root):
     transform_labeled, transform_val = train_val_transforms(cifar100_config)
-    base_dataset = datasets.CIFAR100(
-        root, train=True, download=True)
+    base_dataset = datasets.CIFAR100(root, train=True, download=True)
 
     train_labeled_idxs, train_unlabeled_idxs = x_u_split(
         args, base_dataset.targets)
@@ -95,7 +94,6 @@ def get_cifar100(args, root):
     train_labeled_dataset = CIFAR100SSL(
         root, train_labeled_idxs, train=True,
         transform=transform_labeled,
-        return_idx=True,
     )
 
     train_unlabeled_dataset = CIFAR100SSL(
@@ -245,6 +243,7 @@ class CIFAR100SSL(datasets.CIFAR100):
                          target_transform=target_transform,
                          download=download)
         self.return_idx = return_idx
+        self.indices = indexs
         if indexs is not None:
             self.data = self.data[indexs]
             self.targets = np.array(self.targets)[indexs]
@@ -260,7 +259,7 @@ class CIFAR100SSL(datasets.CIFAR100):
             target = self.target_transform(target)
 
         if self.return_idx:
-            return img, target, index
+            return img, target, self.indices[index]
         else:
             return img, target
 

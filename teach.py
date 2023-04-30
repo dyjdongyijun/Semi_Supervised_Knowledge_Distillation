@@ -17,12 +17,14 @@ os.environ['TORCH_HOME'] = os.path.join('..','pretrained')
 
 
 def get_cifar10_config(args):
-    args.num_class = 10
+    args.input_dim = [3,32,32] # input_dim[1:] can be arbitrary
+    return args
+
+def get_cifar100_config(args):
     args.input_dim = [3,32,32] # input_dim[1:] can be arbitrary
     return args
 
 def get_timagenet_config(args):
-    args.num_class = 200
     args.input_dim = [3,64,64] # input_dim[1:] can be arbitrary
     return args
 
@@ -70,7 +72,7 @@ def _teacher_loader(args):
     if args.dataset=='cifar10':
         train_set = datasets.CIFAR10(root='../data', train=True, download=True, transform=transform)
         test_set = datasets.CIFAR10(root='../data', train=False, download=True, transform=transform)
-    elif args.dataset=='cifar10':
+    elif args.dataset=='cifar100':
         train_set = datasets.CIFAR100(root='../data', train=True, download=True, transform=transform)
         test_set = datasets.CIFAR100(root='../data', train=False, download=True, transform=transform)
     elif args.dataset=='timagenet200':
@@ -108,7 +110,7 @@ if __name__=='__main__':
     parser.add_argument('--batch_size', type=int, default=10000, 
                         help='batch size')
     parser.add_argument('--dataset', type=str, default='cifar10', 
-                        help='experiment dataset: cifar10 / timagenet200')
+                        help='experiment dataset: cifar10 / cifar100 / timagenet200')
     parser.add_argument('--source_path', type=str, default='../data', 
                         help='path to data source')
     # teacher
@@ -116,18 +118,22 @@ if __name__=='__main__':
                         help='teacher architecture: resnet50 / densenet161 / resnet50<w2/w5>')
     parser.add_argument('--teacher_pretrain', type=str, default='cifar10', 
                         help='pretraining method: cifar10 (supervised) / imagenet (supervised) / swav (on imagenet)')
-    parser.add_argument('--teacher_dim', type=int, default=10, 
-                        help='dimension of pretrained features')
 
     args = parser.parse_args()
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     config_dict = {
         'cifar10': get_cifar10_config,
+        'cifar100': get_cifar100_config,
         'timagenet200': get_timagenet_config,
     }
     args = config_dict[args.dataset](args)
-    args.teacher_dim = args.num_class
+    teacher_dim_dict = {
+        'cifar10': 10,
+        'imagenet': 1000,
+        'swav': 1000,
+    }
+    args.teacher_dim = teacher_dim_dict[args.teacher_pretrain]
     
     # config dir
     args.pretrained_dir = os.path.join('..', 'pretrained', args.dataset)

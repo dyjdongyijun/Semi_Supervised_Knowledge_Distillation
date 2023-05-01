@@ -52,6 +52,7 @@ def set_seed(args):
     if args.seed is not None:
         cudnn.benchmark = False
         cudnn.deterministic = True
+        # cudnn.enabled = False
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
@@ -260,7 +261,7 @@ def create_model(args):
 
 def get_online_teacher(args):
     if args.teacher_pretrain=='swav': # contrastive pretraining
-        model = SWAV_MODEL_DICT[args.teacher_arch](args.teacher_arch)
+        teacher = SWAV_MODEL_DICT[args.teacher_arch](args.teacher_arch)
     elif args.teacher_pretrain=='imagenet':
         teacher_model, pretrained_weights = IMAGENET_MODEL_DICT[args.teacher_arch]
         teacher = teacher_model(weights=pretrained_weights)

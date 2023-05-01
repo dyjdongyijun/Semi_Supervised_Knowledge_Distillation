@@ -19,14 +19,15 @@ while IFS= read -r line; do
         max_free_memory_gpu_id=$gpu_id
     fi
 done <<< "$output"
+# max_free_memory_gpu_id=7
 echo "The GPU with the maximum free memory is ID: $max_free_memory_gpu_id"
 
 
-batch_size=64
+batch_size=32
 dataset=cifar100
 num_labeled=$[100*4]
 total_steps=$[2**18]
-threshold=0.95
+threshold=0.8
 rkd_lambda=1e-3
 rkd_edge=cos
 teacher_arch=resnet50w5
@@ -46,9 +47,9 @@ python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_si
     --rkd_lambda $rkd_lambda --rkd_edge $rkd_edge
 
 # FixMatch
-# python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
-#     --dataset $dataset --num_labeled $num_labeled --arch wideresnet \
-#     --total_steps $total_steps --expand_labels --threshold $threshold \
-#     --labeler $labeler --augstrength $augstrength --percentunl $percentunl \
-#     --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain --teacher_mode offline \
-#     --amp --opt_level O2 --wdecay 0.001 
+python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
+    --dataset $dataset --num_labeled $num_labeled --arch wideresnet \
+    --total_steps $total_steps --expand_labels --threshold $threshold \
+    --labeler $labeler --augstrength $augstrength --percentunl $percentunl \
+    --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain --teacher_mode offline \
+    --amp --opt_level O2 --wdecay 0.001 

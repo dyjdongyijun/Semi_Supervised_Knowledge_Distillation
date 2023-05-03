@@ -654,6 +654,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
         
         if (mask_probs.avg < mask_prob_max - 0.01) and (args.T_amp > 1):
             args.T /= args.T_amp
+            logger.info(f'Current temperature: {args.T}')
         mask_prob_max = max(mask_prob_max, mask_probs.avg)
 
         if not args.no_progress:
@@ -700,6 +701,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 'test_acc_1_avg20': np.mean(test_accs[-20:]),
                 'test_acc_5': top5,
                 'test_loss': test_loss,
+                'temperature': args.T,
             })
 
     if args.local_rank in [-1, 0]:

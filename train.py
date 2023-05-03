@@ -369,7 +369,7 @@ def main():
     parser.add_argument('--T', default=1, type=float,
                         help='pseudo label temperature')
     parser.add_argument('--T_amp', default=1, type=float,
-                        help='T /= T_amp when mask_prob < mask_prob_max - 0.01 (assume >= 1))')
+                        help='T /= T_amp when mask_prob < mask_prob_max - 0.1 (assume >= 1))')
     parser.add_argument('--teacher_arch', type=str, default='densenet161', 
                         choices=['densenet161','resnet50','resnet50w2','resnet50w5'],
                         help='teacher architecture')
@@ -652,7 +652,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 
         logger.info(description+'\n')
         
-        if (mask_probs.avg < mask_prob_max - 0.01) and (args.T_amp > 1):
+        if (mask_probs.avg < mask_prob_max - 0.1) and (args.T_amp > 1):
             args.T /= args.T_amp
             logger.info(f'Current temperature: {args.T}')
         mask_prob_max = max(mask_prob_max, mask_probs.avg)

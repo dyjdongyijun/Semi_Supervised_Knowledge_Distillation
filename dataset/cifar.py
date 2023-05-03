@@ -127,9 +127,10 @@ def x_u_split(args, labels):
         labeled_idx = np.random.choice(labels, args.num_labeled, False)
     elif args.labeler=='class':
         labeled_idx = []
+        rng = np.random.RandomState(42)
         for i in range(args.num_classes):
             idx = np.where(labels == i)[0]
-            idx = np.random.choice(idx, label_per_class, False)
+            idx = rng.choice(idx, label_per_class, False)
             labeled_idx.extend(idx)
         labeled_idx = np.array(labeled_idx)
     elif args.labeler.split('-')[0] == 'active':

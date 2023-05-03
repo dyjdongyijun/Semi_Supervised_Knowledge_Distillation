@@ -133,19 +133,18 @@ def process_config(args):
     args.tags = config_dict.ConfigDict({
         'dataset': f'{args.dataset}_ncls{args.num_classes}_lpc{args.label_per_class}_{args.labeler}',
         'arch': f'{args.arch}', #+ 'x'.join(map(str, args.input_dim)) + '-' + '-'.join(map(str, args.hidden_dim)),
-        # 'dac': f'fixmatch_lambda-u{args.lambda_u:.1e}_pslab-thres{args.threshold:.2f}',
+        'dac': f'fixmatch_lamb{args.lambda_u:.1e}_thre{args.threshold:.2f}_T{args.T:.1f}_amp{args.T_amp}',
         'rkd': f'rkd-{args.rkd_edge}_{args.rkd_edge_min}_lambda{args.rkd_lambda:.1e}-p{args.rkd_norm:d}',
         'pretrain': f'{args.teacher_arch}_{args.teacher_pretrain}_dim{args.teacher_dim:d}_{args.teacher_mode}',
         'train': f'lr{args.lr:.1e}_epo{args.epochs:d}_bs{args.batch_size:d}_wd{args.wdecay:.1e}',
         'random': f'seed{args.seed:d}',
-        'scalerkdloss': f'scalerkd{args.rkd_downweight}',
         'percunl': f'percunl{args.percentunl}',
         'augstrength': f'augstrength{args.augstrength}',
     })
     
     # exp_name
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d-%H%M")
-    args.exp_name = f'{args.tags.dataset}__{args.tags.arch}__{args.tags.rkd}__{args.tags.pretrain}__{args.tags.train}__{args.tags.random}__{args.tags.scalerkdloss}__{args.tags.percunl}__{args.tags.augstrength}__{timestamp}'
+    args.exp_name = f'{args.tags.dataset}__{args.tags.percunl}__{args.tags.augstrength}__{args.tags.rkd}__{args.tags.pretrain}__{args.tags.dac}__{args.tags.arch}__{args.tags.train}__{args.tags.random}__{timestamp}'
     args.result_dir = os.path.join(args.out, args.exp_name)
     
     return args
@@ -352,9 +351,6 @@ def main():
                         help='path to pretrained model/features')
     parser.add_argument('--resume', default='', type=str,
                         help='path to latest checkpoint (default: none)')
-    parser.add_argument('--rkd_downweight', type=str, default='', 
-                        choices=['', 'mask', 'naive', 'naive2'],
-                        help='flag for scaling RKD loss by magnitude of FM loss.',)
     parser.add_argument('--rkd_edge', default='cos', type=str,
                         choices=['cos', 'maxmatch'], 
                         help='edges of data graph that characterize pair-wise relation between samples: cos(u,v) = (normalized(t(u),2) * normalized(t(v),2)).sum / maxmatch(u,v) = argmax(t(u))==argmax(t(v))')
@@ -362,8 +358,6 @@ def main():
                         help='sparsification of data graph: w_e = (w_e >= rkd_tol) * w_e [note w_e >= 0]')
     parser.add_argument('--rkd_lambda', default=0.0, type=float,
                         help='coefficient of relational knowledge distillation loss')
-    parser.add_argument('--rkd_mask_clip', type=float, default=0.2, 
-                        help='when rkd_downweight==mask: max mask probability drop beyond which rkd_lambda decays',)
     parser.add_argument('--rkd_norm', default=2, type=int,
                         choices=[1,2], help='order of the norm for RKD loss')
     parser.add_argument('--root', type=str, default=os.path.join('..','data'), 
@@ -374,6 +368,8 @@ def main():
                         help='manual epoch number (useful on restarts)')
     parser.add_argument('--T', default=1, type=float,
                         help='pseudo label temperature')
+    parser.add_argument('--T_amp', default=1, type=float,
+                        help='T /= T_amp when mask_prob < mask_prob_max - 0.01 (assume >= 1))')
     parser.add_argument('--teacher_arch', type=str, default='densenet161', 
                         choices=['densenet161','resnet50','resnet50w2','resnet50w5'],
                         help='teacher architecture')
@@ -600,7 +596,6 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
             max_probs, targets_u = torch.max(pseudo_label, dim=-1)
             mask = max_probs.ge(args.threshold).float()
             mask_prob = mask.mean().item()
-            mask_prob_max = max(mask_prob_max, mask_prob)
             Lu = (F.cross_entropy(logits_u_s, targets_u, reduction='none') * mask).mean()
             
             # rkd loss
@@ -614,19 +609,9 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 Lkd = rkd_loss(args, rkd_features_model, rkd_features_teacher) # on gpu
             else:
                 Lkd = torch.Tensor([0.0]).to(args.device)
-
-            # if want to scale RKD loss to be on par with FM loss
-            if args.rkd_downweight == 'mask':
-                rkd_dw = math.exp(-(mask_prob_max-mask_prob)/args.rkd_mask_clip*(mask_prob_max-mask_prob>args.rkd_mask_clip))
-            elif args.rkd_downweight == 'naive':
-                rkd_dw = Lu.detach().item()
-            elif args.rkd_downweight == 'naive2':
-                rkd_dw = Lu.detach().item() / args.rkd_lambda
-            else:
-                rkd_dw = 1.0
                 
             # loss
-            loss = Lx + args.lambda_u * Lu + rkd_dw * args.rkd_lambda * Lkd
+            loss = Lx + args.lambda_u * Lu + args.rkd_lambda * Lkd
 
             if args.amp:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -666,6 +651,10 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 p_bar.update()
                 
         logger.info(description+'\n')
+        
+        if (mask_probs.avg < mask_prob_max - 0.01) and (args.T_amp > 1):
+            args.T /= args.T_amp
+        mask_prob_max = max(mask_prob_max, mask_probs.avg)
 
         if not args.no_progress:
             p_bar.close()

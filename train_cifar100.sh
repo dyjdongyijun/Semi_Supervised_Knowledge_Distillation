@@ -23,7 +23,7 @@ done <<< "$output"
 echo "The GPU with the maximum free memory is ID: $max_free_memory_gpu_id"
 
 
-batch_size=32
+batch_size=64
 dataset=cifar100
 num_labeled=$[100*4]
 total_steps=$[2**18]
@@ -43,13 +43,5 @@ python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_si
     --total_steps $total_steps --expand_labels --threshold $threshold \
     --labeler $labeler --augstrength $augstrength --percentunl $percentunl \
     --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain --teacher_mode offline \
-    --amp --opt_level O2 --wdecay 0.001 \
-    --rkd_lambda $rkd_lambda --rkd_edge $rkd_edge
-
-# FixMatch
-python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
-    --dataset $dataset --num_labeled $num_labeled --arch wideresnet \
-    --total_steps $total_steps --expand_labels --threshold $threshold \
-    --labeler $labeler --augstrength $augstrength --percentunl $percentunl \
-    --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain --teacher_mode offline \
-    --amp --opt_level O2 --wdecay 0.001 
+    --rkd_lambda $rkd_lambda --rkd_edge $rkd_edge 
+    # --amp --opt_level O2 --wdecay 0.001 

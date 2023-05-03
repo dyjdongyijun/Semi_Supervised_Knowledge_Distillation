@@ -19,6 +19,7 @@ while IFS= read -r line; do
         max_free_memory_gpu_id=$gpu_id
     fi
 done <<< "$output"
+max_free_memory_gpu_id=7
 echo "The GPU with the maximum free memory is ID: $max_free_memory_gpu_id"
 
 
@@ -26,6 +27,7 @@ batch_size=64
 dataset=cifar10
 num_labeled=$[10*4]
 total_steps=$[2**17]
+T_amp=2
 rkd_lambda=1e-3
 rkd_edge=cos
 teacher_arch=densenet161
@@ -38,14 +40,14 @@ percentunl=100
 # FixMatch + RKD
 python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
     --dataset $dataset --num_labeled $num_labeled --arch wideresnet \
-    --total_steps $total_steps --expand_labels \
+    --total_steps $total_steps --expand_labels --T_amp $T_amp\
     --labeler $labeler --augstrength $augstrength --percentunl $percentunl \
     --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain --teacher_mode offline \
     --rkd_lambda $rkd_lambda --rkd_edge $rkd_edge
 
 # FixMatch
-python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
-    --dataset $dataset --num_labeled $num_labeled --arch wideresnet \
-    --total_steps $total_steps --expand_labels \
-    --labeler $labeler --augstrength $augstrength --percentunl $percentunl \
-    --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain --teacher_mode offline
+# python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
+#     --dataset $dataset --num_labeled $num_labeled --arch wideresnet \
+#     --total_steps $total_steps --expand_labels \
+#     --labeler $labeler --augstrength $augstrength --percentunl $percentunl \
+#     --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain --teacher_mode offline

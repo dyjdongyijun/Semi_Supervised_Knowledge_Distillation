@@ -32,7 +32,8 @@ from utils import AverageMeter, accuracy
 from teach import SWAV_MODEL_DICT, IMAGENET_MODEL_DICT, CIFAR10_MODEL_DICT
 
 logger = logging.getLogger(__name__)
-best_acc = 0
+best_acc = 0.0
+mask_prob_max = 0.0
 
 DATASET_GETTERS = {
     'cifar10': get_cifar10,
@@ -470,6 +471,8 @@ def main():
         args.result_dir = os.path.dirname(args.resume)
         checkpoint = torch.load(args.resume)
         best_acc = checkpoint['best_acc']
+        mask_prob_max = checkpoint['mask_max']
+        args.T = checkpoint['temperature']
         args.start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         if args.use_ema:
@@ -522,6 +525,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
     if args.amp:
         from apex import amp
     global best_acc
+    global mask_prob_max
     test_accs = []
     end = time.time()
 
@@ -543,7 +547,6 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
         losses_u = AverageMeter()
         losses_rkd = AverageMeter()
         mask_probs = AverageMeter()
-        mask_prob_max = 0.0
         description = ""
         
         if not args.no_progress:
@@ -681,6 +684,8 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 'ema_state_dict': ema_to_save.state_dict() if args.use_ema else None,
                 'acc': test_acc,
                 'best_acc': best_acc,
+                'mask_max': mask_prob_max,
+                'temperature': args.T,
                 'optimizer': optimizer.state_dict(),
                 'scheduler': scheduler.state_dict(),
             }, is_best, args.result_dir)
@@ -696,6 +701,7 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
                 'train_loss_u': losses_u.avg,
                 'train_loss_rkd': losses_rkd.avg,
                 'mask': mask_probs.avg,
+                'mask_max': mask_prob_max,
                 'test_acc_1': test_acc,
                 'test_acc_1_best': best_acc,
                 'test_acc_1_avg20': np.mean(test_accs[-20:]),

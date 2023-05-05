@@ -32,8 +32,6 @@ from utils import AverageMeter, accuracy
 from teach import SWAV_MODEL_DICT, IMAGENET_MODEL_DICT, CIFAR10_MODEL_DICT
 
 logger = logging.getLogger(__name__)
-best_acc = 0.0
-mask_prob_max = 0.0
 
 DATASET_GETTERS = {
     'cifar10': get_cifar10,
@@ -367,9 +365,9 @@ def main():
                         help="random seed")
     parser.add_argument('--start_epoch', default=0, type=int,
                         help='manual epoch number (useful on restarts)')
-    parser.add_argument('--T', default=1, type=float,
+    parser.add_argument('--T', default=1.0, type=float,
                         help='pseudo label temperature')
-    parser.add_argument('--T_amp', default=1, type=float,
+    parser.add_argument('--T_amp', default=1.0, type=float,
                         help='T /= T_amp when mask_prob < mask_prob_max - 0.1 (assume >= 1))')
     parser.add_argument('--teacher_arch', type=str, default='densenet161', 
                         choices=['densenet161','resnet50','resnet50w2','resnet50w5'],
@@ -511,7 +509,7 @@ def main():
 
     model.zero_grad()
     train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
-          model, optimizer, ema_model, scheduler, teacher)
+          model, optimizer, ema_model, scheduler, teacher, best_acc, mask_prob_max)
     
     if args.alert:
         wandb.alert(
@@ -521,11 +519,11 @@ def main():
 
 
 def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
-          model, optimizer, ema_model, scheduler, teacher):
+          model, optimizer, ema_model, scheduler, teacher, best_acc=0.0, mask_prob_max=0.0):
     if args.amp:
         from apex import amp
-    global best_acc
-    global mask_prob_max
+    # global best_acc
+    # global mask_prob_max
     test_accs = []
     end = time.time()
 

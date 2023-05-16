@@ -37,7 +37,7 @@ labeler=class
 augstrength=10
 percentunl=100
 
-resume=../result/cifar10_ncls10_lpc4_class__percunl100__augstrength10__rkd-cos_0.0_lambda1.0e-03-p2__densenet161_cifar10_dim10_offline__fixmatch_lamb1.0e+00_thre0.95_T1.0_amp2.0__wideresnet__lr3.0e-02_epo128_bs64_wd5.0e-04__seed5__2023-05-04-1539/checkpoint.pth.tar
+# resume=../result/.../checkpoint.pth.tar
 
 # FixMatch + RKD
 python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
@@ -45,8 +45,7 @@ python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_si
     --total_steps $total_steps --expand_labels --T_amp $T_amp\
     --labeler $labeler --augstrength $augstrength --percentunl $percentunl \
     --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain --teacher_mode offline \
-    --rkd_lambda $rkd_lambda --rkd_edge $rkd_edge \
-    --resume $resume
+    --rkd_lambda $rkd_lambda --rkd_edge $rkd_edge #--resume $resume
 
 # FixMatch
 # python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \

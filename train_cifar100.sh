@@ -19,14 +19,14 @@ while IFS= read -r line; do
         max_free_memory_gpu_id=$gpu_id
     fi
 done <<< "$output"
-# max_free_memory_gpu_id=7
 echo "The GPU with the maximum free memory is ID: $max_free_memory_gpu_id"
 
+seed=5
 
 batch_size=64
 dataset=cifar100
 num_labeled=$[100*4]
-total_steps=$[2**18]
+total_steps=$[2**17]
 threshold=0.8
 rkd_lambda=1e-3
 rkd_edge=cos
@@ -38,7 +38,7 @@ augstrength=10
 percentunl=100
 
 # FixMatch + RKD
-python train.py --seed 5 --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
+python train.py --seed $seed --gpu_id $max_free_memory_gpu_id --batch_size $batch_size \
     --dataset $dataset --num_labeled $num_labeled --arch wideresnet \
     --total_steps $total_steps --expand_labels --threshold $threshold \
     --labeler $labeler --augstrength $augstrength --percentunl $percentunl \

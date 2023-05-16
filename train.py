@@ -477,6 +477,9 @@ def main():
             ema_model.ema.load_state_dict(checkpoint['ema_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         scheduler.load_state_dict(checkpoint['scheduler'])
+    else:
+        best_acc = 0.0
+        mask_prob_max = 0.0
 
     if args.amp:
         from apex import amp
@@ -522,8 +525,6 @@ def train(args, labeled_trainloader, unlabeled_trainloader, test_loader,
           model, optimizer, ema_model, scheduler, teacher, best_acc=0.0, mask_prob_max=0.0):
     if args.amp:
         from apex import amp
-    # global best_acc
-    # global mask_prob_max
     test_accs = []
     end = time.time()
 

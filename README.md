@@ -2,10 +2,16 @@
 
 ## Setup
 
+### Environment setup
+```
+$ conda env create -f environment.yml -n rkd
+$ conda activate rkd
+```
+
 ### File organization
 - The relative paths for the datasets, the pretrained teacher models/features, and the pre-allocated directory for results are configured as follows.
     ```python
-    .
+    ..
     |-- cifar10_pretrained # teacher models pretrained on CIFAR-10 
     |-- data # datasets: cifar-10/100
     |-- pretrained # teacher models
@@ -18,7 +24,7 @@
     |   |   |-- resnet50w5_swav1000_active-fl_400.npy # coreset labeled samples selected via StochasticGreedy
     |   |   |-- ...
     |-- result # experiment results
-    |-- Semi_Supervised_Knowledge_Distillation # main implementation 
+    |-- Semi_Supervised_Knowledge_Distillation # main implementation (this repo)
     ```
 
 ### Pretrained teacher features

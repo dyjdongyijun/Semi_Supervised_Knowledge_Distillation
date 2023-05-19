@@ -109,3 +109,4 @@ venv.bak/
 aux*
 wandb/
 _test*
+shcache/

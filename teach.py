@@ -7,7 +7,7 @@ from functools import partial
 from torchvision import datasets, transforms
 from torch.utils.data import Dataset, DataLoader
 import torchvision.models as tvmodels
-# ref: https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10
+# ref: https://github/huyvnphan/PyTorch_CIFAR10
 sys.path.append('..')
 from cifar10_pretrained.cifar10_models import resnet, densenet, mobilenetv2
 from dataset.cifar import train_val_transforms, cifar10_config, cifar100_config
@@ -107,7 +107,7 @@ def teach(args, model, loaders):
     
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Laplacian SSL: Feature Inference with Teacher Models')
-    parser.add_argument('--batch_size', type=int, default=10000, 
+    parser.add_argument('--batch_size', type=int, default=1000, 
                         help='batch size')
     parser.add_argument('--dataset', type=str, default='cifar10', 
                         help='experiment dataset: cifar10 / cifar100 / timagenet200')

@@ -1,58 +1,80 @@
-# Semi-supervised Relational Knowledge Distillation
+# Cluster-aware Semi-supervised Learning: DAC + RKD
 
 ## Setup
 
-### Setup teacher models pre-trained on CIFAR-10
-We follow the instruction from [fbuchert: Unofficial PyTorch implementation of FixMatch](https://github.com/fbuchert/fixmatch-pytorch) and [kekmodel: Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch) to download the weights of teacher models pre-trained on CIFAR-10:
-```
-$ cd ..
-$ git clone https://github.com/huyvnphan/PyTorch_CIFAR10.git
-$ mv PyTorch_CIFAR10 cifar10_pretrained
-$ cd cifar10_pretrained
-$ python train.py --download_weights 1
-```
-Alternatively, one can download the pre-trained weights directly from the [Google Drive](https://drive.google.com/file/d/17fmN8eQdLpq2jIMQ_X0IXDPXfI9oVWgq/view) link provided in [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10) and unzip the file in `../cifar10_pretrained/cifar10_models/`.
+### File organization
+- The relative paths for the datasets, the pretrained teacher models/features, and the pre-allocated directory for results are configured as follows.
+    ```python
+    .
+    |-- cifar10_pretrained # teacher models pretrained on CIFAR-10 
+    |-- data # datasets: cifar-10/100
+    |-- pretrained # teacher models
+    |   |-- cifar10
+    |   |   |-- densenet161_cifar10_dim10.pt # pretrained teacher features
+    |   |   |-- densenet161_cifar1010_active-fl_40.npy # coreset labeled samples selected via StochasticGreedy
+    |   |   |-- ...
+    |   |-- cifar100
+    |   |   |-- resnet50w5_swav_dim1000.pt # pretrained teacher features
+    |   |   |-- resnet50w5_swav1000_active-fl_400.npy # coreset labeled samples selected via StochasticGreedy
+    |   |   |-- ...
+    |-- result # experiment results
+    |-- Semi_Supervised_Knowledge_Distillation # main implementation 
+    ```
+
+### Pretrained teacher features
+- **CIFAR-10 pretrained models**:
+    For CIFAR-10 experiments, we use in-distribution teacher models pretrained on the same dataset (CIFAR-10) based on the [PyTorch models trained on CIFAR-10 dataset](https://github.com/huyvnphan/PyTorch_CIFAR10.git) as follows:
+    ```
+    $ cd ..
+    $ git clone https://github.com/huyvnphan/PyTorch_CIFAR10.git
+    $ mv PyTorch_CIFAR10 cifar10_pretrained
+    $ cd cifar10_pretrained
+    $ python train.py --download_weights 1
+    ```
+    Alternatively, one can download the pretrained weights directly from the [Google Drive](https://drive.google.com/file/d/17fmN8eQdLpq2jIMQ_X0IXDPXfI9oVWgq/view) link provided in [PyTorch_CIFAR10](https://github/huyvnphan/PyTorch_CIFAR10) and unzip the file in `../cifar10_pretrained/cifar10_models/`.
+
+- **CIFAR-100 pretrained models**: 
+    For CIFAR-100 experiments, we use out-of-distribution teacher models pretrained on a different dataset (ImageNet) via (unsupervised) contrastive learning (SwAV) based on the official [PyTorch implementation and pretrained models for SwAV](https://github.com/facebookresearch/swav) as follows:
+    ```python
+    import torch
+    model = torch.hub.load('facebookresearch/swav:main', 'resnet50w5')
+    ```
+
+- **Inference of teacher features on the pretrained teacher models**
+    ```
+    $ bash teach.sh
+    ```
+    For CIFAR-10 features evaluated with supervisedly pretrained DenseNet161 on CIFAR-10:
+    ```
+    $ python teach.py --dataset cifar10 --teacher_arch densenet161 --teacher_pretrain cifar10
+    ```
+    For CIFAR-100 features evaluated with pretrained ResNet-50 (of width x5, i.e., resnet50w5) on ImageNet via SwAV:
+    ```
+    $ python teach.py --dataset cifar100 --teacher_arch resnet50w5 --teacher_pretrain swav
+    ```
+
+### FixMatch
+- We follow the implementations in [fbuchert: Unofficial PyTorch implementation of FixMatch](https://github.com/fbuchert/fixmatch-pytorch) and [kekmodel: Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch)
 
 ----------------
 
-## FixMatch
-Based on semi-supervised learning via FixMatch adopted from the following [Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch)
-
-### Results
-
-#### CIFAR10
-| #Labels | 40 | 250 | 4000 |
-|:---:|:---:|:---:|:---:|
-| Paper (RA) | 86.19 ± 3.37 | 94.93 ± 0.65 | 95.74 ± 0.05 |
-| This code | 93.60 | 95.31 | 95.77 |
-| Acc. curve | [link](https://tensorboard.dev/experiment/YcLQA52kQ1KZIgND8bGijw/) | [link](https://tensorboard.dev/experiment/GN36hbbRTDaBPy7z8alE1A/) | [link](https://tensorboard.dev/experiment/5flaQd1WQyS727hZ70ebbA/) |
-
-\* November 2020. Retested after fixing EMA issues.
-#### CIFAR100
-| #Labels | 400 | 2500 | 10000 |
-|:---:|:---:|:---:|:---:|
-| Paper (RA) | 51.15 ± 1.75 | 71.71 ± 0.11 | 77.40 ± 0.12 |
-| This code | 57.50 | 72.93 | 78.12 |
-| Acc. curve | [link](https://tensorboard.dev/experiment/y4Mmz3hRTQm6rHDlyeso4Q/) | [link](https://tensorboard.dev/experiment/mY3UExn5RpOanO1Hx1vOxg/) | [link](https://tensorboard.dev/experiment/EDb13xzJTWu5leEyVf2qfQ/) |
-
-\* Training using the following options `--amp --opt_level O2 --wdecay 0.001`
-
-----------------
-
-## Usage
-
-### Train
-
-```
-python 
-```
+## Experiments
+- CIFAR-10 experiments
+    ```
+    $ bash train_cifar10.sh
+    ```
+- CIFAR-100 experiments
+    ```
+    $ bash train_cifar100.sh
+    ```
 
 ----------------
 
 ## References
 - [fbuchert: Unofficial PyTorch implementation of FixMatch](https://github.com/fbuchert/fixmatch-pytorch)
 - [kekmodel: Unofficial PyTorch implementation of FixMatch](https://github/kekmodel/FixMatch-pytorch)
-- [PyTorch_CIFAR10](https://vscode.dev/github/huyvnphan/PyTorch_CIFAR10)
+- [PyTorch models trained on CIFAR-10 dataset](https://github.com/huyvnphan/PyTorch_CIFAR10.git) 
+- [PyTorch implementation and pretrained models for SwAV](https://github.com/facebookresearch/swav)
 - [Official TensorFlow implementation of FixMatch](https://github.com/google-research/fixmatch)
 - [Unofficial PyTorch implementation of MixMatch](https://github.com/YU1ut/MixMatch-pytorch)
 - [Unofficial PyTorch Reimplementation of RandAugment](https://github.com/ildoonet/pytorch-randaugment)
@@ -65,5 +87,12 @@ python
     author={Kihyuk Sohn and David Berthelot and Chun-Liang Li and Zizhao Zhang and Nicholas Carlini and Ekin D. Cubuk and Alex Kurakin and Han Zhang and Colin Raffel},
     journal={arXiv preprint arXiv:2001.07685},
     year={2020},
+}
+
+@article{caron2020unsupervised,
+  title={Unsupervised Learning of Visual Features by Contrasting Cluster Assignments},
+  author={Caron, Mathilde and Misra, Ishan and Mairal, Julien and Goyal, Priya and Bojanowski, Piotr and Joulin, Armand},
+  booktitle={Proceedings of Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2020}
 }
 ```

@@ -20,17 +20,20 @@ echo "The GPU with the maximum free memory is ID: $max_free_memory_gpu_id"
 
 batch_size=1000
 
+# dataset=cifar10
+# teacher_arch=densenet161
+# teacher_pretrain=cifar10
+# CUDA_VISIBLE_DEVICES=$max_free_memory_gpu_id python teach.py --dataset $dataset --batch_size $batch_size --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain
+
 dataset=cifar10
-teacher_arch=densenet161
-teacher_pretrain=cifar10
-
-CUDA_VISIBLE_DEVICES=$max_free_memory_gpu_id python teach.py --dataset $dataset --batch_size $batch_size --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain
-
-dataset=cifar100
 teacher_arch=resnet50w5
 teacher_pretrain=swav
-
 CUDA_VISIBLE_DEVICES=$max_free_memory_gpu_id python teach.py --dataset $dataset --batch_size $batch_size --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain
+
+# dataset=cifar100
+# teacher_arch=resnet50w5
+# teacher_pretrain=swav
+# CUDA_VISIBLE_DEVICES=$max_free_memory_gpu_id python teach.py --dataset $dataset --batch_size $batch_size --teacher_arch $teacher_arch --teacher_pretrain $teacher_pretrain
 
 # dataset=timagenet200
 # teacher_arch=resnet50w2

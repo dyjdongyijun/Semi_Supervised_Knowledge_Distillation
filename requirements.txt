@@ -38,7 +38,7 @@ google-auth-oauthlib==0.4.6
 graphlearning==1.2.1
 graphviz==0.8.4
 greenlet==2.0.2
-grpcio==1.51.3
+grpcio==1.53.0
 hupper==1.11
 idna==3.4
 importlib-resources==5.10.0

@@ -1,5 +1,11 @@
 # Cluster-aware Semi-supervised Learning: DAC + RKD
 
+This repository presents code for our [paper](https://arxiv.org/abs/2307.11030):
+```
+Cluster-aware Semi-supervised Learning: Relational Knowledge Distillation Provably Learns Clustering.
+Yijun Dong*, Kevin Miller*, Qi Lei, Rachel Ward. NeurIPS 2023.
+```
+
 ## Setup
 
 ### Environment setup

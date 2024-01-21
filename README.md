@@ -92,7 +92,6 @@ $ conda activate rkd
 - [Unofficial PyTorch Reimplementation of RandAugment](https://github.com/ildoonet/pytorch-randaugment)
 - [PyTorch image models](https://github.com/rwightman/pytorch-image-models)
 
-## Citations
 ```
 @article{sohn2020fixmatch,
   title={Fixmatch: Simplifying semi-supervised learning with consistency and confidence},

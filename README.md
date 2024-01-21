@@ -109,11 +109,10 @@ $ conda activate rkd
   year={2020}
 }
 
-@inproceedings{
-    dong2023clusteraware,
-    title={Cluster-aware Semi-supervised Learning: Relational Knowledge Distillation Provably Learns Clustering},
-    author={Yijun Dong and Kevin Miller and Qi Lei and Rachel Ward},
-    booktitle={Thirty-seventh Conference on Neural Information Processing Systems},
-    year={2023}
+@inproceedings{dong2023clusteraware,
+  title={Cluster-aware Semi-supervised Learning: Relational Knowledge Distillation Provably Learns Clustering},
+  author={Yijun Dong and Kevin Miller and Qi Lei and Rachel Ward},
+  booktitle={Thirty-seventh Conference on Neural Information Processing Systems},
+  year={2023}
 }
 ```

@@ -95,10 +95,12 @@ $ conda activate rkd
 ## Citations
 ```
 @article{sohn2020fixmatch,
-    title={FixMatch: Simplifying Semi-Supervised Learning with Consistency and Confidence},
-    author={Kihyuk Sohn and David Berthelot and Chun-Liang Li and Zizhao Zhang and Nicholas Carlini and Ekin D. Cubuk and Alex Kurakin and Han Zhang and Colin Raffel},
-    journal={arXiv preprint arXiv:2001.07685},
-    year={2020},
+  title={Fixmatch: Simplifying semi-supervised learning with consistency and confidence},
+  author={Sohn, Kihyuk and Berthelot, David and Carlini, Nicholas and Zhang, Zizhao and Zhang, Han and Raffel, Colin A and Cubuk, Ekin Dogus and Kurakin, Alexey and Li, Chun-Liang},
+  journal={Advances in neural information processing systems},
+  volume={33},
+  pages={596--608},
+  year={2020}
 }
 
 @article{caron2020unsupervised,
@@ -106,5 +108,13 @@ $ conda activate rkd
   author={Caron, Mathilde and Misra, Ishan and Mairal, Julien and Goyal, Priya and Bojanowski, Piotr and Joulin, Armand},
   booktitle={Proceedings of Advances in Neural Information Processing Systems (NeurIPS)},
   year={2020}
+}
+
+@inproceedings{
+    dong2023clusteraware,
+    title={Cluster-aware Semi-supervised Learning: Relational Knowledge Distillation Provably Learns Clustering},
+    author={Yijun Dong and Kevin Miller and Qi Lei and Rachel Ward},
+    booktitle={Thirty-seventh Conference on Neural Information Processing Systems},
+    year={2023}
 }
 ```
